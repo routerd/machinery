@@ -41,6 +41,14 @@ func NewScheme() *Scheme {
 	}
 }
 
+func (s *Scheme) Convert(src, dest interface{}) error {
+	return s.converter.Convert(src, dest)
+}
+
+func (s *Scheme) RegisterConversionFunc(conversionFunc interface{}) error {
+	return s.converter.RegisterConversionFunc(conversionFunc)
+}
+
 func (s *Scheme) AddKnownTypes(gv GroupVersion, types ...Object) {
 	for _, obj := range types {
 		rt := dereferenceType(obj)
@@ -74,8 +82,8 @@ func (s *Scheme) New(gvk GroupVersionKind) (Object, error) {
 
 func (s *Scheme) GroupVersionKind(obj Object) (GroupVersionKind, error) {
 	rt := dereferenceType(obj)
-	if vk, ok := s.typeToGVK[rt]; ok {
-		return vk, nil
+	if gvk, ok := s.typeToGVK[rt]; ok {
+		return gvk, nil
 	}
 	return GroupVersionKind{}, fmt.Errorf("object %T is not registered", obj)
 }
@@ -86,16 +94,19 @@ func (s *Scheme) ListGroupVersionKind(obj Object) (GroupVersionKind, error) {
 		return GroupVersionKind{}, err
 	}
 
-	listVK := GroupVersionKind{
+	listGVK := GroupVersionKind{
 		Group:   gvk.Group,
 		Version: gvk.Version,
-		Kind:    gvk.Kind + "List",
+		Kind:    gvk.Kind,
 	}
-	if _, ok := s.gvkToType[listVK]; !ok {
+	if !strings.HasSuffix(listGVK.Kind, "List") {
+		listGVK.Kind = listGVK.Kind + "List"
+	}
+	if _, ok := s.gvkToType[listGVK]; !ok {
 		return GroupVersionKind{},
-			fmt.Errorf("no list type for %s is not registered", obj)
+			fmt.Errorf("no list type for %s is registered", gvk)
 	}
-	return listVK, nil
+	return listGVK, nil
 }
 
 func (s *Scheme) KnownObjectKinds() []GroupVersionKind {

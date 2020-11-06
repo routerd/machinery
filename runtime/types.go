@@ -36,6 +36,10 @@ func (gvk GroupVersionKind) GroupVersion() GroupVersion {
 	return GroupVersion{Group: gvk.Group, Version: gvk.Version}
 }
 
+func (gvk GroupVersionKind) GroupKind() GroupKind {
+	return GroupKind{Group: gvk.Group, Kind: gvk.Kind}
+}
+
 type GroupVersion struct {
 	Group   string `json:"group"`
 	Version string `json:"version"`
@@ -45,8 +49,17 @@ func (gv GroupVersion) String() string {
 	return gv.Group + "/" + gv.Version
 }
 
+type GroupKind struct {
+	Group string `json:"group"`
+	Kind  string `json:"kind"`
+}
+
+func (gk GroupKind) String() string {
+	return gk.Group + "." + gk.Kind
+}
+
 type ObjectKind interface {
-	SetGroupVersionKind(vk GroupVersionKind)
+	SetGroupVersionKind(GroupVersionKind)
 	GetGroupVersionKind() GroupVersionKind
 }
 
