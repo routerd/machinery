@@ -21,6 +21,7 @@ package runtime
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"routerd.net/machinery/runtime/convert"
@@ -28,16 +29,18 @@ import (
 
 // Scheme holds references to known types.
 type Scheme struct {
-	converter *convert.Converter
-	gvkToType map[GroupVersionKind]reflect.Type
-	typeToGVK map[reflect.Type]GroupVersionKind
+	converter       *convert.Converter
+	gvkToType       map[GroupVersionKind]reflect.Type
+	typeToGVK       map[reflect.Type]GroupVersionKind
+	versionPriority map[string][]string
 }
 
 func NewScheme() *Scheme {
 	return &Scheme{
-		converter: convert.NewConverter(),
-		gvkToType: map[GroupVersionKind]reflect.Type{},
-		typeToGVK: map[reflect.Type]GroupVersionKind{},
+		converter:       convert.NewConverter(),
+		gvkToType:       map[GroupVersionKind]reflect.Type{},
+		typeToGVK:       map[reflect.Type]GroupVersionKind{},
+		versionPriority: map[string][]string{},
 	}
 }
 
@@ -68,6 +71,7 @@ func (s *Scheme) AddKnownTypeWithKind(gvk GroupVersionKind, obj Object) {
 
 	s.gvkToType[gvk] = rt
 	s.typeToGVK[rt] = gvk
+	s.refreshVersionPriority()
 }
 
 // New creates a new instance for the given GroupVersionKind
@@ -110,15 +114,18 @@ func (s *Scheme) ListGroupVersionKind(obj Object) (GroupVersionKind, error) {
 }
 
 func (s *Scheme) KnownObjectKinds() []GroupVersionKind {
-	var vks []GroupVersionKind
-	for vk := range s.gvkToType {
-		if strings.HasSuffix(vk.Kind, "List") {
+	var gvks []GroupVersionKind
+	for gvk := range s.gvkToType {
+		if strings.HasSuffix(gvk.Kind, "List") {
 			continue
 		}
-
-		vks = append(vks, vk)
+		if gvk.Version != s.versionPriority[gvk.Group][0] {
+			// skip versions not of highest priority
+			continue
+		}
+		gvks = append(gvks, gvk)
 	}
-	return vks
+	return gvks
 }
 
 // dereferenceType returns the Value-Type of given pointer.
@@ -133,4 +140,24 @@ func dereferenceType(obj Object) reflect.Type {
 		panic("All types must be pointers to structs.")
 	}
 	return rt
+}
+
+func (s *Scheme) refreshVersionPriority() {
+	groupVersions := map[string]APIVersionByPriority{}
+	for gvk := range s.gvkToType {
+		version, err :=
+			ParseAPIVersion(gvk.Version)
+		if err != nil {
+			panic(err)
+		}
+		groupVersions[gvk.Group] = append(groupVersions[gvk.Group], version)
+	}
+
+	for group, v := range groupVersions {
+		sort.Sort(v)
+		s.versionPriority[group] = make([]string, len(v))
+		for i, apiVersion := range v {
+			s.versionPriority[group][i] = apiVersion.String()
+		}
+	}
 }

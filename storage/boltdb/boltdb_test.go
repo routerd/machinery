@@ -16,7 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package boltdb
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 
 	"routerd.net/machinery/meta"
 	"routerd.net/machinery/runtime"
+	storagev1 "routerd.net/machinery/storage/api/v1"
 )
 
 func TestStorage(t *testing.T) {
@@ -63,7 +64,7 @@ func TestStorage(t *testing.T) {
 
 	// Get it again
 	getObj := &testObject{}
-	require.NoError(t, s.Get(ctx, NamespacedName{
+	require.NoError(t, s.Get(ctx, storagev1.NamespacedName{
 		Name: obj.Name, Namespace: obj.Namespace,
 	}, getObj))
 	assert.Equal(t, s.objGVK, getObj.GetGroupVersionKind())
@@ -132,7 +133,7 @@ func TestWatch(t *testing.T) {
 	obj1 := &testObject{ObjectMeta: meta.ObjectMeta{Name: "test1a", Namespace: "test"}}
 	require.NoError(t, s.Create(ctx, obj1))
 
-	var events []Event
+	var events []storagev1.Event
 	var wg sync.WaitGroup
 	wg.Add(3) // wait for 3 events
 	go func() {
@@ -158,9 +159,9 @@ func TestWatch(t *testing.T) {
 	// Assertions
 	wg.Wait()
 	if assert.Len(t, events, 3) {
-		assert.Equal(t, Event{Type: Added, Object: obj1}, events[0])
-		assert.Equal(t, Event{Type: Added, Object: obj2}, events[1])
-		assert.Equal(t, Event{Type: Modified, Object: obj2update}, events[2])
+		assert.Equal(t, storagev1.Event{Type: storagev1.Added, Object: obj1}, events[0])
+		assert.Equal(t, storagev1.Event{Type: storagev1.Added, Object: obj2}, events[1])
+		assert.Equal(t, storagev1.Event{Type: storagev1.Modified, Object: obj2update}, events[2])
 	}
 }
 

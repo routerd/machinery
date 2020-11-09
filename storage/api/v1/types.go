@@ -16,7 +16,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package v1
+
+import "routerd.net/machinery/runtime"
 
 type NamespacedName struct {
 	Name      string `json:"name"`
@@ -25,4 +27,29 @@ type NamespacedName struct {
 
 func (nn NamespacedName) String() string {
 	return nn.Name + "." + nn.Namespace
+}
+
+func Key(obj Object) NamespacedName {
+	return NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}
+}
+
+// Object can be persistent in storage.
+type Object interface {
+	runtime.Object
+	GetName() string
+	GetNamespace() string
+	GetUID() string
+	SetUID(string)
+	GetResourceVersion() string
+	SetResourceVersion(string)
+	GetGeneration() int64
+	SetGeneration(int64)
+}
+
+// ListObject
+type ListObject interface {
+	runtime.Object
 }

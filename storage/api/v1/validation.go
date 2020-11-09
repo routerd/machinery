@@ -16,7 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package v1
 
 import (
 	"fmt"
@@ -45,7 +45,7 @@ func validateRFC1123Subdomain(subdomain string) error {
 		return fmt.Errorf("rfc1123 DNS subdomain MUST not exceed 253 characters")
 	}
 
-	if !rfc1123LabelRegEx.MatchString(subdomain) {
+	if !rfc1123SubdomainRegEx.MatchString(subdomain) {
 		return fmt.Errorf("rfc1123 DNS labels MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters, - or .")
 	}
 

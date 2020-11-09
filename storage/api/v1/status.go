@@ -16,21 +16,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package v1
 
-import "routerd.net/machinery/runtime"
+import (
+	"routerd.net/machinery/meta"
+	"routerd.net/machinery/runtime"
+)
 
-// Event is emitted for every change of an object in storage.
-type Event struct {
-	Type   EventType
-	Object runtime.Object
+var _ runtime.Object = (*Status)(nil)
+
+// Status may be returned for calls that don't return an object.
+type Status struct {
+	meta.TypeMeta `json:",inline"`
+	Status        StatusType `json:"status"`
+	Reason        string     `json:"reason"`
+	Message       string     `json:"message"`
 }
 
-type EventType string
+type StatusType string
 
 const (
-	Added    EventType = "Added"
-	Modified EventType = "Modified"
-	Deleted  EventType = "Deleted"
-	Error    EventType = "Error"
+	StatusSuccess StatusType = "Success"
+	StatusFailure StatusType = "Failure"
 )
+
+func (s *Status) DeepCopyObject() runtime.Object {
+	statusClone := &Status{}
+	runtime.DeepCopy(s, statusClone)
+	return statusClone
+}

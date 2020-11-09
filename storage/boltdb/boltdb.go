@@ -16,7 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package boltdb
 
 import (
 	"bytes"
@@ -31,6 +31,8 @@ import (
 
 	"routerd.net/machinery/errors"
 	"routerd.net/machinery/runtime"
+	storagev1 "routerd.net/machinery/storage/api/v1"
+	"routerd.net/machinery/storage/event"
 )
 
 // defaulted may be implement
@@ -48,11 +50,15 @@ func (e ErrBucketNotFound) Error() string {
 // this special key remembers the GVK of all objects in the bucket.
 const gvkKey = "__GVK__"
 
+var (
+	_ storagev1.Client = (*BoltDBStorage)(nil)
+)
+
 type BoltDBStorage struct {
 	db     *bolt.DB
 	scheme *runtime.Scheme
 
-	hub             *Hub
+	hub             *event.Hub
 	objGVK, listGVK runtime.GroupVersionKind
 	bucket          string
 }
@@ -77,7 +83,7 @@ func NewBoltDBStorage(
 		listGVK: listGVK,
 		bucket:  objGVK.GroupKind().String(),
 	}
-	s.hub = NewHub(100, s.list)
+	s.hub = event.NewHub(100, s.list)
 
 	return s, s.ensureStorageVersion()
 }
@@ -86,7 +92,7 @@ func (s *BoltDBStorage) Run(stopCh <-chan struct{}) {
 	s.hub.Run(stopCh)
 }
 
-func (s *BoltDBStorage) Watch(ctx context.Context, obj Object, opts ...ListOption) (WatchClient, error) {
+func (s *BoltDBStorage) Watch(ctx context.Context, obj storagev1.Object, opts ...storagev1.ListOption) (storagev1.WatchClient, error) {
 	if err := s.ensureObjectGKV(obj); err != nil {
 		return nil, err
 	}
@@ -95,7 +101,7 @@ func (s *BoltDBStorage) Watch(ctx context.Context, obj Object, opts ...ListOptio
 
 // Get a single object from the underlying storage.
 // Returns ErrNotFound if no item with the given key exists.
-func (s *BoltDBStorage) Get(ctx context.Context, key NamespacedName, obj Object) error {
+func (s *BoltDBStorage) Get(ctx context.Context, key storagev1.NamespacedName, obj storagev1.Object) error {
 	if err := s.ensureObjectGKV(obj); err != nil {
 		return err
 	}
@@ -124,8 +130,8 @@ func (s *BoltDBStorage) Get(ctx context.Context, key NamespacedName, obj Object)
 	return json.Unmarshal(b, obj)
 }
 
-func (s *BoltDBStorage) list(opts ...ListOption) ([]runtime.Object, error) {
-	var options ListOptions
+func (s *BoltDBStorage) list(opts ...storagev1.ListOption) ([]runtime.Object, error) {
+	var options storagev1.ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&options)
 	}
@@ -153,7 +159,7 @@ func (s *BoltDBStorage) list(opts ...ListOption) ([]runtime.Object, error) {
 			if err != nil {
 				return err
 			}
-			if err := json.Unmarshal(v, obj.(Object)); err != nil {
+			if err := json.Unmarshal(v, obj.(storagev1.Object)); err != nil {
 				return err
 			}
 			out = append(out, obj)
@@ -167,12 +173,12 @@ func (s *BoltDBStorage) list(opts ...ListOption) ([]runtime.Object, error) {
 }
 
 // List returns all entries, matching the given ListOptions.
-func (s *BoltDBStorage) List(ctx context.Context, listObj ListObject, opts ...ListOption) error {
+func (s *BoltDBStorage) List(ctx context.Context, listObj storagev1.ListObject, opts ...storagev1.ListOption) error {
 	if err := s.ensureListObjectGKV(listObj); err != nil {
 		return err
 	}
 
-	var options ListOptions
+	var options storagev1.ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&options)
 	}
@@ -192,7 +198,7 @@ func (s *BoltDBStorage) List(ctx context.Context, listObj ListObject, opts ...Li
 }
 
 // Create persists the given Object to
-func (s *BoltDBStorage) Create(ctx context.Context, obj Object, opts ...CreateOption) error {
+func (s *BoltDBStorage) Create(ctx context.Context, obj storagev1.Object, opts ...storagev1.CreateOption) error {
 	if err := s.ensureObjectGKV(obj); err != nil {
 		return err
 	}
@@ -207,10 +213,7 @@ func (s *BoltDBStorage) Create(ctx context.Context, obj Object, opts ...CreateOp
 		}
 	}
 
-	key := NamespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}.String()
+	key := storagev1.Key(obj).String()
 
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(s.bucket))
@@ -243,7 +246,7 @@ func (s *BoltDBStorage) Create(ctx context.Context, obj Object, opts ...CreateOp
 		if err := bucket.Put([]byte(key), b); err != nil {
 			return err
 		}
-		s.hub.Broadcast(Added, obj)
+		s.hub.Broadcast(storagev1.Added, obj)
 		return nil
 	})
 	if err != nil {
@@ -253,7 +256,7 @@ func (s *BoltDBStorage) Create(ctx context.Context, obj Object, opts ...CreateOp
 }
 
 // Update updates metadata and the Objects spec, while ignoring changes to the Objects Status.
-func (s *BoltDBStorage) Update(ctx context.Context, obj Object, opts ...UpdateOption) error {
+func (s *BoltDBStorage) Update(ctx context.Context, obj storagev1.Object, opts ...storagev1.UpdateOption) error {
 	if err := s.ensureObjectGKV(obj); err != nil {
 		return err
 	}
@@ -275,10 +278,7 @@ func (s *BoltDBStorage) Update(ctx context.Context, obj Object, opts ...UpdateOp
 		}
 
 		// Get existing
-		key := NamespacedName{
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
-		}.String()
+		key := storagev1.Key(obj).String()
 		existing, err := s.loadNew(bucket, key)
 		if err != nil {
 			return err
@@ -318,7 +318,7 @@ func (s *BoltDBStorage) Update(ctx context.Context, obj Object, opts ...UpdateOp
 		if err := bucket.Put([]byte(key), b); err != nil {
 			return err
 		}
-		s.hub.Broadcast(Modified, obj)
+		s.hub.Broadcast(storagev1.Modified, obj)
 		return nil
 	})
 	if err != nil {
@@ -328,7 +328,7 @@ func (s *BoltDBStorage) Update(ctx context.Context, obj Object, opts ...UpdateOp
 }
 
 // UpdateStatus ignores metadata and the Objects spec and only persists status changes.
-func (s *BoltDBStorage) UpdateStatus(ctx context.Context, obj Object, opts ...UpdateOption) error {
+func (s *BoltDBStorage) UpdateStatus(ctx context.Context, obj storagev1.Object, opts ...storagev1.UpdateOption) error {
 	if err := s.ensureObjectGKV(obj); err != nil {
 		return err
 	}
@@ -350,10 +350,7 @@ func (s *BoltDBStorage) UpdateStatus(ctx context.Context, obj Object, opts ...Up
 		}
 
 		// Get existing
-		key := NamespacedName{
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
-		}.String()
+		key := storagev1.Key(obj).String()
 		existing, err := s.loadNew(bucket, key)
 		if err != nil {
 			return err
@@ -395,7 +392,7 @@ func (s *BoltDBStorage) UpdateStatus(ctx context.Context, obj Object, opts ...Up
 		if err := bucket.Put([]byte(key), b); err != nil {
 			return err
 		}
-		s.hub.Broadcast(Modified, obj)
+		s.hub.Broadcast(storagev1.Modified, obj)
 		return nil
 	})
 	if err != nil {
@@ -404,7 +401,7 @@ func (s *BoltDBStorage) UpdateStatus(ctx context.Context, obj Object, opts ...Up
 	return nil
 }
 
-func (s *BoltDBStorage) Delete(ctx context.Context, obj Object, opts ...DeleteOption) error {
+func (s *BoltDBStorage) Delete(ctx context.Context, obj storagev1.Object, opts ...storagev1.DeleteOption) error {
 	if err := s.ensureObjectGKV(obj); err != nil {
 		return err
 	}
@@ -419,10 +416,7 @@ func (s *BoltDBStorage) Delete(ctx context.Context, obj Object, opts ...DeleteOp
 		}
 
 		// Get existing
-		key := NamespacedName{
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
-		}.String()
+		key := storagev1.Key(obj).String()
 		existing, err := s.loadNew(bucket, key)
 		if err != nil {
 			return err
@@ -432,7 +426,7 @@ func (s *BoltDBStorage) Delete(ctx context.Context, obj Object, opts ...DeleteOp
 		if err := bucket.Delete([]byte(key)); err != nil {
 			return err
 		}
-		s.hub.Broadcast(Deleted, existing)
+		s.hub.Broadcast(storagev1.Deleted, existing)
 		return nil
 	})
 	if err != nil {
@@ -441,7 +435,7 @@ func (s *BoltDBStorage) Delete(ctx context.Context, obj Object, opts ...DeleteOp
 	return nil
 }
 
-func (s *BoltDBStorage) loadNew(bucket *bolt.Bucket, key string) (Object, error) {
+func (s *BoltDBStorage) loadNew(bucket *bolt.Bucket, key string) (storagev1.Object, error) {
 	v := bucket.Get([]byte(key))
 	if v == nil {
 		return nil, errors.ErrNotFound{Key: key, GVK: s.objGVK}
@@ -451,7 +445,7 @@ func (s *BoltDBStorage) loadNew(bucket *bolt.Bucket, key string) (Object, error)
 	if err != nil {
 		return nil, err
 	}
-	obj := runtimeObj.(Object)
+	obj := runtimeObj.(storagev1.Object)
 	if err := json.Unmarshal(v, obj); err != nil {
 		return nil, err
 	}
@@ -521,7 +515,7 @@ func (s *BoltDBStorage) ensureStorageVersion() error {
 }
 
 // Ensure that the object type is of the GKV this repository is persisting.
-func (s *BoltDBStorage) ensureObjectGKV(obj Object) error {
+func (s *BoltDBStorage) ensureObjectGKV(obj storagev1.Object) error {
 	objGVK, err := s.scheme.GroupVersionKind(obj)
 	if err != nil {
 		return err
@@ -534,7 +528,7 @@ func (s *BoltDBStorage) ensureObjectGKV(obj Object) error {
 }
 
 // Ensure that the list object type is of the GKV this repository is persisting.
-func (s *BoltDBStorage) ensureListObjectGKV(obj ListObject) error {
+func (s *BoltDBStorage) ensureListObjectGKV(obj storagev1.ListObject) error {
 	listGVK, err := s.scheme.ListGroupVersionKind(obj)
 	if err != nil {
 		return err
@@ -546,30 +540,12 @@ func (s *BoltDBStorage) ensureListObjectGKV(obj ListObject) error {
 	return nil
 }
 
-func (s *BoltDBStorage) validateNameNamespace(obj Object) error {
-	if err := ValidateName(obj.GetName()); err != nil {
+func (s *BoltDBStorage) validateNameNamespace(obj storagev1.Object) error {
+	if err := storagev1.ValidateName(obj.GetName()); err != nil {
 		return err
 	}
-	if err := ValidateNamespace(obj.GetNamespace()); err != nil {
+	if err := storagev1.ValidateNamespace(obj.GetNamespace()); err != nil {
 		return err
 	}
 	return nil
-}
-
-// Object can be persistent in
-type Object interface {
-	runtime.Object
-	GetName() string
-	GetNamespace() string
-	GetUID() string
-	SetUID(string)
-	GetResourceVersion() string
-	SetResourceVersion(string)
-	GetGeneration() int64
-	SetGeneration(int64)
-}
-
-// ListObject
-type ListObject interface {
-	runtime.Object
 }

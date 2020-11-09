@@ -16,10 +16,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package event
 
 import (
 	"routerd.net/machinery/runtime"
+	storagev1 "routerd.net/machinery/storage/api/v1"
 	"routerd.net/machinery/util/ringbuffer"
 )
 
@@ -28,27 +29,27 @@ type Hub struct {
 	buffer  *ringbuffer.Buffer
 	listAll listAllFn
 
-	broadcast chan Event
+	broadcast chan storagev1.Event
 	clients   map[EventClient]struct{}
 	register  chan EventClient
 }
 
-type listAllFn func(opts ...ListOption) ([]runtime.Object, error)
+type listAllFn func(opts ...storagev1.ListOption) ([]runtime.Object, error)
 
 func NewHub(eventBufferSize int, listAll listAllFn) *Hub {
 	return &Hub{
 		buffer:  ringbuffer.NewBuffer(eventBufferSize),
 		listAll: listAll,
 
-		broadcast: make(chan Event),
+		broadcast: make(chan storagev1.Event),
 		clients:   map[EventClient]struct{}{},
 		register:  make(chan EventClient),
 	}
 }
 
 // Broadcast emits an event to all connected clients.
-func (h *Hub) Broadcast(eventType EventType, obj runtime.Object) {
-	e := Event{
+func (h *Hub) Broadcast(eventType storagev1.EventType, obj runtime.Object) {
+	e := storagev1.Event{
 		Type:   eventType,
 		Object: obj,
 	}
@@ -57,7 +58,7 @@ func (h *Hub) Broadcast(eventType EventType, obj runtime.Object) {
 }
 
 // Register returns a new client connected to the event hub.
-func (h *Hub) Register(resourceVersion string, opts ...ListOption) EventClient {
+func (h *Hub) Register(resourceVersion string, opts ...storagev1.ListOption) EventClient {
 	c := newEventClient(100, resourceVersion, opts)
 	h.register <- c
 	return c
@@ -104,10 +105,10 @@ func (h *Hub) seed(c EventClient) {
 		// add all items from storage
 		objects, err := h.listAll(c.options()...)
 		if err != nil {
-			c.events() <- Event{
-				Type: Error,
-				Object: &Status{
-					Status:  StatusFailure,
+			c.events() <- storagev1.Event{
+				Type: storagev1.Error,
+				Object: &storagev1.Status{
+					Status:  storagev1.StatusFailure,
 					Reason:  "InternalError",
 					Message: "An internal error occured.",
 				},
@@ -116,8 +117,8 @@ func (h *Hub) seed(c EventClient) {
 			return
 		}
 		for _, obj := range objects {
-			c.events() <- Event{
-				Type:   Added,
+			c.events() <- storagev1.Event{
+				Type:   storagev1.Added,
 				Object: obj,
 			}
 		}
@@ -127,7 +128,7 @@ func (h *Hub) seed(c EventClient) {
 	// Start at specific resource version
 	var start bool
 	for _, obj := range h.buffer.List() {
-		e := obj.(Event)
+		e := obj.(storagev1.Event)
 		o := e.Object.(versioned)
 		if !start {
 			start = o.GetResourceVersion() == c.resourceVersion()
@@ -142,22 +143,22 @@ func (h *Hub) seed(c EventClient) {
 // On error the Event channel is closed and an Error event is emitted.
 type EventClient interface {
 	Close() error
-	EventChan() <-chan Event
-	events() chan<- Event
+	EventChan() <-chan storagev1.Event
+	events() chan<- storagev1.Event
 	resourceVersion() string
-	options() []ListOption
+	options() []storagev1.ListOption
 }
 
 type eventClient struct {
 	rv   string
-	recv chan Event
-	opts []ListOption
+	recv chan storagev1.Event
+	opts []storagev1.ListOption
 }
 
-func newEventClient(bufferSize int, resourceVersion string, opts []ListOption) *eventClient {
+func newEventClient(bufferSize int, resourceVersion string, opts []storagev1.ListOption) *eventClient {
 	return &eventClient{
 		rv:   resourceVersion,
-		recv: make(chan Event, bufferSize),
+		recv: make(chan storagev1.Event, bufferSize),
 		opts: opts,
 	}
 }
@@ -167,7 +168,7 @@ func (c *eventClient) Close() error {
 	return nil
 }
 
-func (c *eventClient) EventChan() <-chan Event {
+func (c *eventClient) EventChan() <-chan storagev1.Event {
 	return c.recv
 }
 
@@ -175,10 +176,10 @@ func (c *eventClient) resourceVersion() string {
 	return c.rv
 }
 
-func (c *eventClient) options() []ListOption {
+func (c *eventClient) options() []storagev1.ListOption {
 	return c.opts
 }
 
-func (c *eventClient) events() chan<- Event {
+func (c *eventClient) events() chan<- storagev1.Event {
 	return c.recv
 }

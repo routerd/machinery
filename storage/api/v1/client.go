@@ -16,34 +16,40 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package v1
 
 import (
 	"context"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"routerd.net/machinery/runtime"
 )
+
+// Client implements all storage interfaces.
+type Client interface {
+	Reader
+	Watcher
+	Writer
+}
+
+// Reader provides read methods for storage access.
+type Reader interface {
+	Get(ctx context.Context, key NamespacedName, obj Object) error
+	List(ctx context.Context, obj ListObject, opts ...ListOption) error
+}
 
 type WatchClient interface {
 	Close() error
 	EventChan() <-chan Event
 }
 
-type Reader interface {
-	Get(ctx context.Context, name string, obj runtime.Object) error
-	List(ctx context.Context, obj runtime.Object, opts ...ListOption) error
-}
-
+// Watcher can be used to watch for to the specified object type.
 type Watcher interface {
 	Watch(ctx context.Context,
-		obj runtime.Object, opts ...ListOption) (WatchClient, error)
+		obj Object, opts ...ListOption) (WatchClient, error)
 }
 
+// Writer provides write methods for storage access.
 type Writer interface {
-	Create(ctx context.Context, obj runtime.Object, opts ...client.CreateOption) error
-	Delete(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error
-	Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error
-	UpdateStatus(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error
+	Create(ctx context.Context, obj Object, opts ...CreateOption) error
+	Delete(ctx context.Context, obj Object, opts ...DeleteOption) error
+	Update(ctx context.Context, obj Object, opts ...UpdateOption) error
+	UpdateStatus(ctx context.Context, obj Object, opts ...UpdateOption) error
 }
