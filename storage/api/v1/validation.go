@@ -24,44 +24,45 @@ import (
 )
 
 func ValidateName(name string) error {
-	if err := validateRFC1123Label(name); err != nil {
+	if err := validateRFC1035Label(name); err != nil {
 		return fmt.Errorf("invalid name %s: %w", name, err)
 	}
 	return nil
 }
 
 func ValidateNamespace(namespace string) error {
-	if err := validateRFC1123Subdomain(namespace); err != nil {
+	if err := validateRFC1035Subdomain(namespace); err != nil {
 		return fmt.Errorf("invalid namespace %s: %w", namespace, err)
 	}
 	return nil
 }
 
-var rfc1123SubdomainRegEx = regexp.
+var rfc1035SubdomainRegEx = regexp.
 	MustCompile(`^[[:lower:]]([[:lower:]]|-|\.)*[[:lower:]]$`)
 
-func validateRFC1123Subdomain(subdomain string) error {
+func validateRFC1035Subdomain(subdomain string) error {
 	if len(subdomain) > 253 {
-		return fmt.Errorf("rfc1123 DNS subdomain MUST not exceed 253 characters")
+		return fmt.Errorf(
+			"rfc1035 DNS subdomain MUST not exceed 253 characters")
 	}
 
-	if !rfc1123SubdomainRegEx.MatchString(subdomain) {
-		return fmt.Errorf("rfc1123 DNS labels MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters, - or .")
+	if !rfc1035SubdomainRegEx.MatchString(subdomain) {
+		return fmt.Errorf("rfc1035 DNS labels MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters, - or .")
 	}
 
 	return nil
 }
 
-var rfc1123LabelRegEx = regexp.
-	MustCompile(`^[[:lower:]]([[:lower:]]|-|[[:digit:]])*[[:lower:]]$`)
+var rfc1035LabelRegEx = regexp.
+	MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
 
-func validateRFC1123Label(label string) error {
+func validateRFC1035Label(label string) error {
 	if len(label) > 63 {
-		return fmt.Errorf("rfc1123 DNS labels MUST not exceed 63 characters")
+		return fmt.Errorf("rfc1035 DNS labels MUST not exceed 63 characters")
 	}
 
-	if !rfc1123LabelRegEx.MatchString(label) {
-		return fmt.Errorf("rfc1123 DNS labels MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters or -")
+	if !rfc1035LabelRegEx.MatchString(label) {
+		return fmt.Errorf("rfc1035 DNS labels MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters or -")
 	}
 
 	return nil

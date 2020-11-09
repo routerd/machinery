@@ -30,6 +30,7 @@ import (
 	"routerd.net/machinery/runtime"
 	storagev1 "routerd.net/machinery/storage/api/v1"
 	"routerd.net/machinery/storage/boltdb"
+	"routerd.net/machinery/storage/inmem"
 )
 
 type Storage struct {
@@ -78,6 +79,54 @@ func NewStorage(
 		mr.gkToStorage[listGVK.GroupKind()] = repo
 	}
 	return mr, nil
+}
+
+// Init BoltDB backed storage for the given GVKs.
+func (s *Storage) InitBoltDB(db *bolt.DB, gvks ...runtime.GroupVersionKind) error {
+	for _, gvk := range gvks {
+		obj, err := s.scheme.New(gvk)
+		if err != nil {
+			return err
+		}
+
+		listGVK, err := s.scheme.ListGroupVersionKind(obj)
+		if err != nil {
+			return err
+		}
+
+		repo, err := boltdb.NewBoltDBStorage(s.scheme, obj.(storagev1.Object), db)
+		if err != nil {
+			return err
+		}
+
+		s.gkToStorage[gvk.GroupKind()] = repo
+		s.gkToStorage[listGVK.GroupKind()] = repo
+	}
+	return nil
+}
+
+// Init In-Memory backed storage for the given GVKs.
+func (s *Storage) InitInMemory(db *bolt.DB, gvks ...runtime.GroupVersionKind) error {
+	for _, gvk := range gvks {
+		obj, err := s.scheme.New(gvk)
+		if err != nil {
+			return err
+		}
+
+		listGVK, err := s.scheme.ListGroupVersionKind(obj)
+		if err != nil {
+			return err
+		}
+
+		store, err := inmem.NewStorage(s.scheme, obj.(storagev1.Object))
+		if err != nil {
+			return err
+		}
+
+		s.gkToStorage[gvk.GroupKind()] = store
+		s.gkToStorage[listGVK.GroupKind()] = store
+	}
+	return nil
 }
 
 func (s *Storage) Run(stopCh <-chan struct{}) {

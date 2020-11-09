@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1
 
-import "routerd.net/machinery/runtime"
+import (
+	"fmt"
+
+	"routerd.net/machinery/runtime"
+)
 
 type NamespacedName struct {
 	Name      string `json:"name"`
@@ -27,6 +31,35 @@ type NamespacedName struct {
 
 func (nn NamespacedName) String() string {
 	return nn.Name + "." + nn.Namespace
+}
+
+func (nn NamespacedName) Validate() error {
+	nameErr := ValidateName(nn.Name)
+	namespaceErr := ValidateNamespace(nn.Namespace)
+
+	if nameErr != nil || namespaceErr != nil {
+		return InvalidNamespaceNameErr{
+			NamespacedName: nn,
+			NameErr:        nameErr,
+			NamespaceErr:   namespaceErr,
+		}
+	}
+	return nil
+}
+
+type InvalidNamespaceNameErr struct {
+	NamespacedName
+	NameErr, NamespaceErr error
+}
+
+func (e InvalidNamespaceNameErr) Error() string {
+	if e.NamespaceErr == nil {
+		return fmt.Sprintf("invalid name: %v", e.NameErr)
+	}
+	if e.NameErr == nil {
+		return fmt.Sprintf("invalid namespace: %v", e.NamespaceErr)
+	}
+	return fmt.Sprintf("invalid name and namespace: %v, %v", e.NameErr, e.NamespaceErr)
 }
 
 func Key(obj Object) NamespacedName {
