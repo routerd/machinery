@@ -19,12 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package storage
 
 import (
+	"routerd.net/machinery/api"
 	"routerd.net/machinery/errors"
 	"routerd.net/machinery/util/buffer"
 )
 
 // ListerFn is used to get all existing objects to seed new clients with "Add" events.
-type ListerFn func(opts ...ListOption) ([]Object, error)
+type ListerFn func(opts ...ListOption) ([]api.Object, error)
 
 type indexedBuffer interface {
 	Append(index string, value interface{})
@@ -32,8 +33,8 @@ type indexedBuffer interface {
 }
 
 type event struct {
-	Type            EventType
-	Object          Object
+	Type            api.EventType
+	Object          api.Object
 	ResourceVersion string
 }
 
@@ -60,12 +61,11 @@ func NewHub(list ListerFn) *eventHub {
 	}
 }
 
-func (h *eventHub) Broadcast(
-	eventType EventType, obj Object) {
+func (h *eventHub) Broadcast(eventType api.EventType, obj api.Object) {
 	e := event{
 		Type:            eventType,
 		Object:          obj,
-		ResourceVersion: obj.ObjectMetaAccessor().GetResourceVersion(),
+		ResourceVersion: obj.ObjectMeta().GetResourceVersion(),
 	}
 	h.broadcast <- e
 }
@@ -94,7 +94,7 @@ func (h *eventHub) Run(stopCh <-chan struct{}) {
 			h.seed(c)
 
 		case event := <-h.broadcast:
-			e := Event{
+			e := api.Event{
 				Type:   event.Type,
 				Object: event.Object,
 			}
@@ -133,7 +133,7 @@ func (h *eventHub) seed(c EventClient) {
 				continue
 			}
 
-			e := obj.(*Event)
+			e := obj.(*api.Event)
 			c.eventSink() <- *e
 		}
 		return
@@ -148,8 +148,8 @@ func (h *eventHub) seed(c EventClient) {
 		return
 	}
 	for _, obj := range objects {
-		c.eventSink() <- Event{
-			Type:   Added,
+		c.eventSink() <- api.Event{
+			Type:   api.Added,
 			Object: obj,
 		}
 	}

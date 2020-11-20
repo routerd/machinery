@@ -21,6 +21,7 @@ package storage
 import (
 	"fmt"
 
+	"routerd.net/machinery/api"
 	"routerd.net/machinery/validate"
 )
 
@@ -29,7 +30,7 @@ type defaulted interface {
 	Default() error
 }
 
-func Default(obj Object) error {
+func Default(obj api.Object) error {
 	if d, ok := obj.(defaulted); ok {
 		if err := d.Default(); err != nil {
 			return fmt.Errorf("calling obj.Default(): %w", err)
@@ -42,9 +43,9 @@ type validateCreate interface {
 	ValidateCreate() error
 }
 
-func ValidateCreate(obj Object) error {
-	meta := obj.ObjectMetaAccessor()
-	if len(meta.GetUID()) != 0 {
+func ValidateCreate(obj api.Object) error {
+	meta := obj.ObjectMeta()
+	if len(meta.GetUid()) != 0 {
 		return fmt.Errorf("UID must be empty when creating an object.")
 	}
 	if len(meta.GetResourceVersion()) != 0 {
@@ -70,11 +71,11 @@ func ValidateCreate(obj Object) error {
 }
 
 type validateUpdate interface {
-	ValidateUpdate(old Object) error
+	ValidateUpdate(old api.Object) error
 }
 
-func ValidateUpdate(old, new Object) error {
-	newMeta := new.ObjectMetaAccessor()
+func ValidateUpdate(old, new api.Object) error {
+	newMeta := new.ObjectMeta()
 	if err := validate.ValidateName(newMeta.GetName()); err != nil {
 		return err
 	}
@@ -94,8 +95,8 @@ type validateDelete interface {
 	ValidateDelete() error
 }
 
-func ValidateDelete(obj Object) error {
-	meta := obj.ObjectMetaAccessor()
+func ValidateDelete(obj api.Object) error {
+	meta := obj.ObjectMeta()
 	if err := validate.ValidateName(meta.GetName()); err != nil {
 		return err
 	}

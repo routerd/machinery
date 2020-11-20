@@ -18,15 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package errors
 
-import "fmt"
+import (
+	"fmt"
+
+	"routerd.net/machinery/api"
+)
 
 type ErrNotFound struct {
-	Name, Namespace string
-	TypeFullName    string
+	api.NamespacedName
+	TypeFullName string
 }
 
 func (e ErrNotFound) Error() string {
-	return fmt.Sprintf("%s: %s/%s", e.TypeFullName, e.Namespace, e.Name)
+	return fmt.Sprintf("%s: %s", e.TypeFullName, e.String())
 }
 
 type ErrExpired struct {
@@ -38,19 +42,19 @@ func (e *ErrExpired) Error() string {
 }
 
 type ErrAlreadyExists struct {
-	Name, Namespace string
-	TypeFullName    string
+	api.NamespacedName
+	TypeFullName string
 }
 
 func (e ErrAlreadyExists) Error() string {
-	return fmt.Sprintf("%s already exists: %s/%s", e.TypeFullName, e.Namespace, e.Name)
+	return fmt.Sprintf("%s already exists: %s", e.TypeFullName, e.String())
 }
 
 type ErrConflict struct {
-	Name, Namespace string
-	TypeFullName    string
+	api.NamespacedName
+	TypeFullName string
 }
 
 func (e ErrConflict) Error() string {
-	return fmt.Sprintf("%s conflicting resource version: %s/%s", e.TypeFullName, e.Namespace, e.Name)
+	return fmt.Sprintf("%s conflicting resource version: %s", e.TypeFullName, e.String())
 }

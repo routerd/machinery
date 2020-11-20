@@ -18,12 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package storage
 
+import "routerd.net/machinery/api"
+
 // EventClient represents a client connection to the event hub.
 type EventClient interface {
 	Close() error
-	Events() <-chan Event
+	Events() <-chan api.Event
 
-	eventSink() chan<- Event
+	eventSink() chan<- api.Event
 	options() []ListOption
 	resourceVersion() string
 	error(error)
@@ -34,7 +36,7 @@ type EventClient interface {
 var _ EventClient = (*eventClient)(nil)
 
 type eventClient struct {
-	eventCh chan Event
+	eventCh chan api.Event
 	rv      string
 	opts    []ListOption
 	err     error
@@ -47,7 +49,7 @@ func newEventClient(
 	opts []ListOption,
 ) *eventClient {
 	return &eventClient{
-		eventCh: make(chan Event, bufferSize),
+		eventCh: make(chan api.Event, bufferSize),
 		initCh:  make(chan struct{}),
 		rv:      resourceVersion,
 		opts:    opts,
@@ -59,7 +61,7 @@ func (c *eventClient) Close() error {
 	return nil
 }
 
-func (c *eventClient) Events() <-chan Event {
+func (c *eventClient) Events() <-chan api.Event {
 	return c.eventCh
 }
 
@@ -67,7 +69,7 @@ func (c *eventClient) error(err error) {
 	c.err = err
 }
 
-func (c *eventClient) eventSink() chan<- Event {
+func (c *eventClient) eventSink() chan<- api.Event {
 	return c.eventCh
 }
 

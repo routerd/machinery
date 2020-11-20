@@ -20,11 +20,13 @@ package validate
 
 import (
 	"fmt"
+
+	"routerd.net/machinery/api"
 )
 
-func ValidateNamespacedName(name, namespace string) error {
-	nameErr := ValidateName(name)
-	namespaceErr := ValidateNamespace(namespace)
+func ValidateNamespacedName(nn api.NamespacedName) error {
+	nameErr := ValidateName(nn.Name)
+	namespaceErr := ValidateNamespace(nn.Namespace)
 
 	if nameErr != nil || namespaceErr != nil {
 		return InvalidNamespaceNameErr{

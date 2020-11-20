@@ -1,6 +1,6 @@
 /*
 routerd
-Copyright (C) YEAR  The routerd Authors
+Copyright (C) 2020  The routerd Authors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,15 +16,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-syntax = "proto3";
-package routerd.machinery.testdata.v1;
-option go_package = "routerd.net/machinery/testdata/api/v1";
+package api
 
-message TestObject {
-  string field1 = 1;
-  string field2 = 2;
+type NamespacedName struct {
+	Name, Namespace string
 }
 
-message TestObjectList {
-  repeated TestObject items = 1;
+func (nn NamespacedName) String() string {
+	return nn.Namespace + "/" + nn.Name
 }

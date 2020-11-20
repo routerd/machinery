@@ -20,11 +20,11 @@ package v1
 
 import "google.golang.org/protobuf/types/known/timestamppb"
 
-func (m *ObjectMeta) SetLabel(labels map[string]string) {
+func (m *ObjectMeta) SetLabels(labels map[string]string) {
 	m.Labels = labels
 }
 
-func (m *ObjectMeta) SetUID(uid string) {
+func (m *ObjectMeta) SetUid(uid string) {
 	m.Uid = uid
 }
 

@@ -20,7 +20,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -31,6 +30,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"routerd.net/machinery/api"
 	"routerd.net/machinery/errors"
 	"routerd.net/machinery/validate"
 )
@@ -39,23 +39,25 @@ type InMemoryStorage struct {
 	hub                *eventHub
 	objectFullName     protoreflect.FullName
 	listObjectFullName protoreflect.FullName
-	newObject          func() Object
+	newObject          func() api.Object
 	// newListObject func() ListObject
 	mux      sync.RWMutex
 	data     map[string][]byte
 	sequence uint64
 }
 
-func NewInMemoryStorage(objType Object) *InMemoryStorage {
+var _ Storage = (*InMemoryStorage)(nil)
+
+func NewInMemoryStorage(objType api.Object) *InMemoryStorage {
 	objName := objType.ProtoReflect().Descriptor().FullName()
 	listObjName := protoreflect.FullName(objName + "List")
 
 	s := &InMemoryStorage{
 		objectFullName:     objName,
 		listObjectFullName: listObjName,
-		newObject: func() Object {
+		newObject: func() api.Object {
 			return objType.ProtoReflect().
-				New().Interface().(Object)
+				New().Interface().(api.Object)
 		},
 		data: map[string][]byte{},
 	}
@@ -67,25 +69,21 @@ func (s *InMemoryStorage) Run(stopCh <-chan struct{}) {
 	s.hub.Run(stopCh)
 }
 
-func (s *InMemoryStorage) Get(
-	ctx context.Context,
-	name, namespace string,
-	obj Object,
-) error {
+func (s *InMemoryStorage) Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error {
 	if err := s.checkObject(obj); err != nil {
 		return err
 	}
-	if err := validate.ValidateNamespacedName(name, namespace); err != nil {
+	if err := validate.ValidateNamespacedName(nn); err != nil {
 		return err
 	}
 
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	return s.load(name, namespace, obj)
+	return s.load(nn, obj)
 }
 
-func (s *InMemoryStorage) List(ctx context.Context, listObj ListObject, opts ...ListOption) error {
+func (s *InMemoryStorage) List(ctx context.Context, listObj api.ListObject, opts ...ListOption) error {
 	if err := s.checkListObject(listObj); err != nil {
 		return err
 	}
@@ -97,24 +95,26 @@ func (s *InMemoryStorage) List(ctx context.Context, listObj ListObject, opts ...
 	if err != nil {
 		return err
 	}
-	protoMessages := make([]proto.Message, len(objects))
-	for i := 0; i < len(objects); i++ {
-		protoMessages[i] = objects[i]
+
+	rv := reflect.ValueOf(listObj).Elem()
+	for _, obj := range objects {
+		rv.FieldByName("Items").Set(
+			reflect.Append(rv.FieldByName("Items"), reflect.ValueOf(obj)),
+		)
 	}
-	listObj.SetItems(protoMessages)
 	return nil
 }
 
-func (s *InMemoryStorage) Watch(ctx context.Context, obj Object, opts ...ListOption) (WatchClient, error) {
+func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...ListOption) (WatchClient, error) {
 	if err := s.checkObject(obj); err != nil {
 		return nil, err
 	}
 
 	return s.hub.Register(
-		obj.ObjectMetaAccessor().GetResourceVersion(), opts...)
+		obj.ObjectMeta().GetResourceVersion(), opts...)
 }
 
-func (s *InMemoryStorage) Create(ctx context.Context, obj Object, opts ...CreateOption) error {
+func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...CreateOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -132,12 +132,12 @@ func (s *InMemoryStorage) Create(ctx context.Context, obj Object, opts ...Create
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	meta := obj.ObjectMetaAccessor()
-	key := s.key(meta.GetName(), meta.GetNamespace())
-	if _, ok := s.data[key]; ok { // Already Exists?
+	meta := obj.ObjectMeta()
+	key := api.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace()}
+	if _, ok := s.data[key.String()]; ok { // Already Exists?
 		return errors.ErrAlreadyExists{
-			Name: meta.GetName(), Namespace: meta.GetNamespace(),
-			TypeFullName: string(obj.ProtoReflect().Descriptor().FullName()),
+			NamespacedName: key,
+			TypeFullName:   string(obj.ProtoReflect().Descriptor().FullName()),
 		}
 	}
 
@@ -145,17 +145,17 @@ func (s *InMemoryStorage) Create(ctx context.Context, obj Object, opts ...Create
 	s.sequence++
 	meta.SetGeneration(1)
 	meta.SetResourceVersion(strconv.FormatUint(s.sequence, 10))
-	meta.SetUID(uuid.New().String())
+	meta.SetUid(uuid.New().String())
 
 	// Store
 	if err := s.store(obj); err != nil {
 		return err
 	}
-	s.hub.Broadcast(Added, obj)
+	s.hub.Broadcast(api.Added, obj)
 	return nil
 }
 
-func (s *InMemoryStorage) Delete(ctx context.Context, obj Object, opts ...DeleteOption) error {
+func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -175,19 +175,19 @@ func (s *InMemoryStorage) Delete(ctx context.Context, obj Object, opts ...Delete
 	defer s.mux.Unlock()
 
 	// Load Existing
-	meta := obj.ObjectMetaAccessor()
-	key := s.key(meta.GetName(), meta.GetNamespace())
-	if err := s.load(meta.GetName(), meta.GetNamespace(), obj); err != nil {
+	meta := obj.ObjectMeta()
+	key := api.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace()}
+	if err := s.load(key, obj); err != nil {
 		return err
 	}
 
 	// Delete
-	delete(s.data, key)
-	s.hub.Broadcast(Deleted, obj)
+	delete(s.data, key.String())
+	s.hub.Broadcast(api.Deleted, obj)
 	return nil
 }
 
-func (s *InMemoryStorage) Update(ctx context.Context, obj Object, opts ...UpdateOption) error {
+func (s *InMemoryStorage) Update(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -197,12 +197,13 @@ func (s *InMemoryStorage) Update(ctx context.Context, obj Object, opts ...Update
 	defer s.mux.Unlock()
 
 	// Load Existing
-	meta := obj.ObjectMetaAccessor()
+	meta := obj.ObjectMeta()
 	existingObj := s.newObject()
-	if err := s.load(meta.GetName(), meta.GetNamespace(), existingObj); err != nil {
+	key := api.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace()}
+	if err := s.load(key, existingObj); err != nil {
 		return err
 	}
-	existingMeta := existingObj.ObjectMetaAccessor()
+	existingMeta := existingObj.ObjectMeta()
 
 	// Defaulting
 	if err := Default(obj); err != nil {
@@ -229,8 +230,8 @@ func (s *InMemoryStorage) Update(ctx context.Context, obj Object, opts ...Update
 	// Check ResourceVersion
 	if existingMeta.GetResourceVersion() != meta.GetResourceVersion() {
 		return errors.ErrConflict{
-			Name: meta.GetName(), Namespace: meta.GetNamespace(),
-			TypeFullName: string(obj.ProtoReflect().Descriptor().FullName()),
+			NamespacedName: key,
+			TypeFullName:   string(obj.ProtoReflect().Descriptor().FullName()),
 		}
 	}
 
@@ -238,17 +239,17 @@ func (s *InMemoryStorage) Update(ctx context.Context, obj Object, opts ...Update
 	s.sequence++
 	meta.SetGeneration(meta.GetGeneration() + 1)
 	meta.SetResourceVersion(strconv.FormatUint(s.sequence, 10))
-	meta.SetUID(existingMeta.GetUID())
+	meta.SetUid(existingMeta.GetUid())
 
 	// Store
 	if err := s.store(obj); err != nil {
 		return err
 	}
-	s.hub.Broadcast(Modified, obj)
+	s.hub.Broadcast(api.Modified, obj)
 	return nil
 }
 
-func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj Object, opts ...UpdateOption) error {
+func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -258,12 +259,13 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj Object, opts ...
 	defer s.mux.Unlock()
 
 	// Load Existing
-	meta := obj.ObjectMetaAccessor()
+	meta := obj.ObjectMeta()
 	existingObj := s.newObject()
-	if err := s.load(meta.GetName(), meta.GetNamespace(), existingObj); err != nil {
+	key := api.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace()}
+	if err := s.load(key, existingObj); err != nil {
 		return err
 	}
-	existingMeta := existingObj.ObjectMetaAccessor()
+	existingMeta := existingObj.ObjectMeta()
 
 	// Defaulting
 	if err := Default(obj); err != nil {
@@ -293,17 +295,17 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj Object, opts ...
 	// Ensure correct metadata
 	s.sequence++
 	meta.SetResourceVersion(strconv.FormatUint(s.sequence, 10))
-	meta.SetUID(existingMeta.GetUID())
+	meta.SetUid(existingMeta.GetUid())
 
 	// Store
 	if err := s.store(obj); err != nil {
 		return err
 	}
-	s.hub.Broadcast(Modified, obj)
+	s.hub.Broadcast(api.Modified, obj)
 	return nil
 }
 
-func (s *InMemoryStorage) list(opts ...ListOption) ([]Object, error) {
+func (s *InMemoryStorage) list(opts ...ListOption) ([]api.Object, error) {
 	var options ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&options)
@@ -312,7 +314,7 @@ func (s *InMemoryStorage) list(opts ...ListOption) ([]Object, error) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	var out []Object
+	var out []api.Object
 	for key, entryData := range s.data {
 		if options.Namespace != "" {
 			if !strings.HasPrefix(key, options.Namespace+"/") {
@@ -321,7 +323,7 @@ func (s *InMemoryStorage) list(opts ...ListOption) ([]Object, error) {
 		}
 
 		obj := s.newObject()
-		if err := json.Unmarshal(entryData, obj); err != nil {
+		if err := proto.Unmarshal(entryData, obj); err != nil {
 			return nil, err
 		}
 		out = append(out, obj)
@@ -329,37 +331,34 @@ func (s *InMemoryStorage) list(opts ...ListOption) ([]Object, error) {
 	return out, nil
 }
 
-func (s *InMemoryStorage) key(name, namespace string) string {
-	return namespace + "/" + name
-}
-
-func (s *InMemoryStorage) load(name, namespace string, obj Object) error {
-	data, ok := s.data[s.key(name, namespace)]
+func (s *InMemoryStorage) load(nn api.NamespacedName, obj api.Object) error {
+	data, ok := s.data[nn.String()]
 	if !ok {
 		return errors.ErrNotFound{
-			Name: name, Namespace: namespace,
-			TypeFullName: string(s.objectFullName),
+			NamespacedName: nn,
+			TypeFullName:   string(s.objectFullName),
 		}
 	}
 	if err := proto.Unmarshal(data, obj); err != nil {
-		return err
+		return fmt.Errorf("loading from storage: %w", err)
 	}
 	return nil
 }
 
-func (s *InMemoryStorage) store(obj Object) error {
+func (s *InMemoryStorage) store(obj api.Object) error {
 	data, err := proto.Marshal(obj)
 	if err != nil {
 		return err
 	}
-	key := s.key(
-		obj.ObjectMetaAccessor().GetName(),
-		obj.ObjectMetaAccessor().GetNamespace())
-	s.data[key] = data
+	key := api.NamespacedName{
+		Name:      obj.ObjectMeta().GetName(),
+		Namespace: obj.ObjectMeta().GetNamespace(),
+	}
+	s.data[key.String()] = data
 	return nil
 }
 
-func (s *InMemoryStorage) checkObject(obj Object) error {
+func (s *InMemoryStorage) checkObject(obj api.Object) error {
 	objFullName := obj.ProtoReflect().Descriptor().FullName()
 	if s.objectFullName != objFullName {
 		return fmt.Errorf(
@@ -369,7 +368,7 @@ func (s *InMemoryStorage) checkObject(obj Object) error {
 	return nil
 }
 
-func (s *InMemoryStorage) checkListObject(obj ListObject) error {
+func (s *InMemoryStorage) checkListObject(obj api.ListObject) error {
 	objFullName := obj.ProtoReflect().Descriptor().FullName()
 	if s.listObjectFullName != objFullName {
 		return fmt.Errorf(
