@@ -1,6 +1,6 @@
 //
 //routerd
-//Copyright (C) YEAR  The routerd Authors
+//Copyright (C) 2020  The routerd Authors
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU Affero General Public License as published by
@@ -24,12 +24,14 @@
 package v1
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	proto "github.com/golang/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
+
 	v1 "routerd.net/machinery/api/v1"
-	sync "sync"
 )
 
 const (

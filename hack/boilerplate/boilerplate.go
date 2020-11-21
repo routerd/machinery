@@ -52,10 +52,11 @@ var (
 		"_output":               {},
 		"hack/boilerplate/test": {},
 		"hack/docgen/main.go":   {},
+		".tmp":                  {},
 	}
 	// list all the files contain 'DO NOT EDIT', but are not generated
 	skippedUngeneratedFiles = map[string]struct{}{
-		"hack/boilerplate/boilerplate.py": {},
+		"hack/boilerplate/boilerplate.go": {},
 		"hack/lib/swagger.sh":             {},
 	}
 
