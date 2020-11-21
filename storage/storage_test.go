@@ -32,6 +32,17 @@ import (
 	testdatav1 "routerd.net/machinery/storage/testdata/v1"
 )
 
+func TestInMemoryStorage(t *testing.T) {
+	s := NewInMemoryStorage(&testdatav1.TestObject{})
+
+	// Run
+	stopCh := make(chan struct{})
+	go s.Run(stopCh)
+	defer close(stopCh)
+
+	StorageTestSuite(t, s)
+}
+
 func StorageTestSuite(t *testing.T, s Storage) {
 	ctx := context.Background()
 
@@ -210,12 +221,21 @@ func StorageTestSuite(t *testing.T, s Storage) {
 		Namespace: "test",
 	}, finalizerObj), "machinery.testdata.v1.TestObject test/finalizer-obj: not found")
 
+	// DeleteAllOf
+	// -----------
+
+	// delete all namespaced objects
+	s.DeleteAllOf(ctx, &testdatav1.TestObject{}, InNamespace("test"))
+	namespacedListAfterDeletion := &testdatav1.TestObjectList{}
+	require.NoError(t, s.List(ctx, namespacedListAfterDeletion, InNamespace("test")))
+	assert.Len(t, namespacedListAfterDeletion.Items, 0)
+
 	// Check Events
 	// ------------
 	time.Sleep(1 * time.Second) // wait for all events to be received
 	watcher.Close()
 
-	require.Len(t, events, 10)
+	require.Len(t, events, 12)
 	// first 5 events should be generated added events from storage
 	for i := 0; i < 5; i++ {
 		assert.Equal(t, api.Added, events[i].Type)
@@ -244,6 +264,14 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "finalizer-obj", Namespace: "test",
 	}, api.Deleted, events[9]) // deleted, -> finalizer removed
+
+	// Rest of Namespaced object (DeleteAllOf)
+	assertEventTypeAndNamespaceName(t, api.NamespacedName{
+		Name: "test-obj-1", Namespace: "test",
+	}, api.Deleted, events[10])
+	assertEventTypeAndNamespaceName(t, api.NamespacedName{
+		Name: "test-obj-2", Namespace: "test",
+	}, api.Deleted, events[11])
 }
 
 func assertEventTypeAndNamespaceName(

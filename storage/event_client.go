@@ -30,7 +30,7 @@ type EventClient interface {
 	Close() error
 
 	eventSink() chan<- api.Event
-	options() []ListOption
+	options() ListOptions
 	resourceVersion() string
 	error(error)
 	initDone()
@@ -42,7 +42,7 @@ var _ EventClient = (*eventClient)(nil)
 type eventClient struct {
 	eventCh    chan api.Event
 	rv         string
-	opts       []ListOption
+	opts       ListOptions
 	err        error
 	initCh     chan struct{}
 	deregister chan<- EventClient
@@ -52,7 +52,7 @@ type eventClient struct {
 func newEventClient(
 	bufferSize int,
 	resourceVersion string,
-	opts []ListOption,
+	opts ListOptions,
 	deregister chan<- EventClient,
 ) *eventClient {
 	return &eventClient{
@@ -83,7 +83,7 @@ func (c *eventClient) eventSink() chan<- api.Event {
 	return c.eventCh
 }
 
-func (c *eventClient) options() []ListOption {
+func (c *eventClient) options() ListOptions {
 	return c.opts
 }
 

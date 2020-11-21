@@ -54,6 +54,7 @@ type Watcher interface {
 type Writer interface {
 	Create(ctx context.Context, obj api.Object, opts ...CreateOption) error
 	Delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error
+	DeleteAllOf(ctx context.Context, obj api.Object, opts ...DeleteAllOfOption) error
 	Update(ctx context.Context, obj api.Object, opts ...UpdateOption) error
 	UpdateStatus(ctx context.Context, obj api.Object, opts ...UpdateOption) error
 }
@@ -81,6 +82,15 @@ type DeleteOption interface {
 	ApplyToDelete(opt *DeleteOptions)
 }
 
+type DeleteAllOfOptions struct {
+	DeleteOptions
+	ListOptions
+}
+
+type DeleteAllOfOption interface {
+	ApplyToDeleteAllOf(opt *DeleteAllOfOptions)
+}
+
 type CreateOptions struct{}
 
 type CreateOption interface {
@@ -102,6 +112,10 @@ func (n InNamespace) ApplyToList(opt *ListOptions) {
 
 func (n InNamespace) ApplyToWatch(opt *WatchOptions) {
 	n.ApplyToList(&opt.ListOptions)
+}
+
+func (n InNamespace) ApplyToDeleteAllOf(opts *DeleteAllOfOptions) {
+	n.ApplyToList(&opts.ListOptions)
 }
 
 type MatchLabels map[string]string

@@ -62,7 +62,11 @@ func NewInMemoryStorage(objType api.Object) *InMemoryStorage {
 		},
 		data: map[string][]byte{},
 	}
-	s.hub = NewHub(s.list)
+	s.hub = NewHub(func(options ListOptions) ([]api.Object, error) {
+		s.mux.RLock()
+		defer s.mux.RUnlock()
+		return s.list(options)
+	})
 	return s
 }
 
@@ -89,10 +93,15 @@ func (s *InMemoryStorage) List(ctx context.Context, listObj api.ListObject, opts
 		return err
 	}
 
+	var options ListOptions
+	for _, opt := range opts {
+		opt.ApplyToList(&options)
+	}
+
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	objects, err := s.list(opts...)
+	objects, err := s.list(options)
 	if err != nil {
 		return err
 	}
@@ -111,8 +120,13 @@ func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...Lis
 		return nil, err
 	}
 
+	var options ListOptions
+	for _, opt := range opts {
+		opt.ApplyToList(&options)
+	}
+
 	return s.hub.Register(
-		obj.ObjectMeta().GetResourceVersion(), opts...)
+		obj.ObjectMeta().GetResourceVersion(), options)
 }
 
 func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...CreateOption) error {
@@ -163,13 +177,44 @@ func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...De
 		return err
 	}
 
+	var options DeleteOptions
+	for _, opt := range opts {
+		opt.ApplyToDelete(&options)
+	}
+
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	return s.delete(ctx, obj, opts...)
+	return s.delete(ctx, obj, options)
 }
 
-func (s *InMemoryStorage) delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error {
+func (s *InMemoryStorage) DeleteAllOf(ctx context.Context, obj api.Object, opts ...DeleteAllOfOption) error {
+	// Input validation
+	if err := s.checkObject(obj); err != nil {
+		return err
+	}
+
+	var options DeleteAllOfOptions
+	for _, opt := range opts {
+		opt.ApplyToDeleteAllOf(&options)
+	}
+
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	objects, err := s.list(options.ListOptions)
+	if err != nil {
+		return err
+	}
+	for _, obj := range objects {
+		if err := s.delete(ctx, obj, options.DeleteOptions); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *InMemoryStorage) delete(ctx context.Context, obj api.Object, opts DeleteOptions) error {
 	// Defaulting
 	// because we don't know what the Validation next is expecting
 	if err := Default(obj); err != nil {
@@ -232,7 +277,7 @@ func (s *InMemoryStorage) update(ctx context.Context, obj api.Object, opts ...Up
 	// Finalizer Handling
 	if obj.ObjectMeta().GetDeletedTimestamp() != nil &&
 		len(obj.ObjectMeta().GetFinalizers()) == 0 {
-		return s.delete(ctx, obj)
+		return s.delete(ctx, obj, DeleteOptions{})
 	}
 
 	// Ensure Status is not updated, if the field exists
@@ -323,15 +368,7 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts
 	return nil
 }
 
-func (s *InMemoryStorage) list(opts ...ListOption) ([]api.Object, error) {
-	var options ListOptions
-	for _, opt := range opts {
-		opt.ApplyToList(&options)
-	}
-
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
+func (s *InMemoryStorage) list(options ListOptions) ([]api.Object, error) {
 	var out []api.Object
 	for key, entryData := range s.data {
 		if options.Namespace != nil {
