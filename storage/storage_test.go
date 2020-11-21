@@ -225,7 +225,7 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	// -----------
 
 	// delete all namespaced objects
-	s.DeleteAllOf(ctx, &testdatav1.TestObject{}, InNamespace("test"))
+	require.NoError(t, s.DeleteAllOf(ctx, &testdatav1.TestObject{}, InNamespace("test")))
 	namespacedListAfterDeletion := &testdatav1.TestObjectList{}
 	require.NoError(t, s.List(ctx, namespacedListAfterDeletion, InNamespace("test")))
 	assert.Len(t, namespacedListAfterDeletion.Items, 0)
