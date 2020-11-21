@@ -20,12 +20,17 @@ syntax = "proto3";
 package machinery.testdata.v1;
 option go_package = "routerd.net/machinery/storage/testdata/api/v1";
 
-import "v1/types.proto";
+import "types.proto";
 
 message TestObject {
-  routerd.machinery.api.v1.ObjectMeta meta = 1;
+  machinery.api.v1.ObjectMeta meta = 1;
   string field1 = 2;
   string field2 = 3;
+  TestObjectStatus status = 4;
+}
+
+message TestObjectStatus {
+  string status = 1;
 }
 
 message TestObjectList {

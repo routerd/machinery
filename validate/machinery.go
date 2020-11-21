@@ -26,7 +26,11 @@ import (
 
 func ValidateNamespacedName(nn api.NamespacedName) error {
 	nameErr := ValidateName(nn.Name)
-	namespaceErr := ValidateNamespace(nn.Namespace)
+
+	var namespaceErr error
+	if nn.Namespace != "" {
+		namespaceErr = ValidateNamespace(nn.Namespace)
+	}
 
 	if nameErr != nil || namespaceErr != nil {
 		return InvalidNamespaceNameErr{
@@ -53,14 +57,14 @@ func (e InvalidNamespaceNameErr) Error() string {
 
 func ValidateName(name string) error {
 	if err := ValidateRFC1035Label(name); err != nil {
-		return fmt.Errorf("invalid name %s: %w", name, err)
+		return fmt.Errorf("invalid name %q: %w", name, err)
 	}
 	return nil
 }
 
 func ValidateNamespace(namespace string) error {
 	if err := ValidateRFC1035Subdomain(namespace); err != nil {
-		return fmt.Errorf("invalid namespace %s: %w", namespace, err)
+		return fmt.Errorf("invalid namespace %q: %w", namespace, err)
 	}
 	return nil
 }

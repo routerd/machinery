@@ -44,20 +44,22 @@ type event struct {
 type eventHub struct {
 	list ListerFn
 
-	buffer    indexedBuffer
-	broadcast chan event
-	clients   map[EventClient]struct{}
-	register  chan EventClient
+	buffer     indexedBuffer
+	broadcast  chan event
+	clients    map[EventClient]struct{}
+	register   chan EventClient
+	deregister chan EventClient
 }
 
 func NewHub(list ListerFn) *eventHub {
 	return &eventHub{
 		list: list,
 
-		buffer:    buffer.NewRingBuffer(100),
-		broadcast: make(chan event),
-		clients:   map[EventClient]struct{}{},
-		register:  make(chan EventClient),
+		buffer:     buffer.NewRingBuffer(100),
+		broadcast:  make(chan event),
+		clients:    map[EventClient]struct{}{},
+		register:   make(chan EventClient),
+		deregister: make(chan EventClient),
 	}
 }
 
@@ -73,7 +75,7 @@ func (h *eventHub) Broadcast(eventType api.EventType, obj api.Object) {
 func (h *eventHub) Register(
 	resourceVersion string, opts ...ListOption,
 ) (EventClient, error) {
-	c := newEventClient(50, resourceVersion, opts)
+	c := newEventClient(50, resourceVersion, opts, h.deregister)
 	h.register <- c
 	c.wait()
 	return c, c.err
@@ -92,6 +94,9 @@ func (h *eventHub) Run(stopCh <-chan struct{}) {
 		case c := <-h.register:
 			h.clients[c] = struct{}{}
 			h.seed(c)
+
+		case c := <-h.deregister:
+			h.closeEventClient(c)
 
 		case event := <-h.broadcast:
 			e := api.Event{

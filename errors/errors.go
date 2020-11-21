@@ -20,6 +20,7 @@ package errors
 
 import (
 	"fmt"
+	"strings"
 
 	"routerd.net/machinery/api"
 )
@@ -30,7 +31,7 @@ type ErrNotFound struct {
 }
 
 func (e ErrNotFound) Error() string {
-	return fmt.Sprintf("%s: %s", e.TypeFullName, e.String())
+	return fmt.Sprintf("%s %s: not found", e.TypeFullName, e.String())
 }
 
 type ErrExpired struct {
@@ -47,7 +48,7 @@ type ErrAlreadyExists struct {
 }
 
 func (e ErrAlreadyExists) Error() string {
-	return fmt.Sprintf("%s already exists: %s", e.TypeFullName, e.String())
+	return fmt.Sprintf("%s %s: already exists", e.TypeFullName, e.String())
 }
 
 type ErrConflict struct {
@@ -56,5 +57,23 @@ type ErrConflict struct {
 }
 
 func (e ErrConflict) Error() string {
-	return fmt.Sprintf("%s conflicting resource version: %s", e.TypeFullName, e.String())
+	return fmt.Sprintf("%s %s: conflicting resource version", e.TypeFullName, e.String())
+}
+
+type ErrBadRequest struct {
+	api.NamespacedName
+	TypeFullName    string
+	FieldViolations []FieldViolation
+}
+
+func (e ErrBadRequest) Error() string {
+	var msg []string
+	for _, fv := range e.FieldViolations {
+		msg = append(msg, fv.Message)
+	}
+	return fmt.Sprintf("%s %s: is invalid: %s", e.TypeFullName, e.String(), strings.Join(msg, ", "))
+}
+
+type FieldViolation struct {
+	Field, Message string
 }

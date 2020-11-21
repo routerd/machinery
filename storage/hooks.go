@@ -20,8 +20,10 @@ package storage
 
 import (
 	"fmt"
+	"reflect"
 
 	"routerd.net/machinery/api"
+	"routerd.net/machinery/errors"
 	"routerd.net/machinery/validate"
 )
 
@@ -58,8 +60,10 @@ func ValidateCreate(obj api.Object) error {
 	if err := validate.ValidateName(meta.GetName()); err != nil {
 		return err
 	}
-	if err := validate.ValidateNamespace(meta.GetNamespace()); err != nil {
-		return err
+	if meta.GetNamespace() != "" {
+		if err := validate.ValidateNamespace(meta.GetNamespace()); err != nil {
+			return err
+		}
 	}
 
 	if d, ok := obj.(validateCreate); ok {
@@ -75,6 +79,50 @@ type validateUpdate interface {
 }
 
 func ValidateUpdate(old, new api.Object) error {
+	if new.ObjectMeta().GetDeletedTimestamp() != nil {
+		// Object is in the process of beeing finalized
+
+		// don't allow adding finalizers
+		if len(new.ObjectMeta().GetFinalizers()) >
+			len(old.ObjectMeta().GetFinalizers()) {
+			return errors.ErrBadRequest{
+				NamespacedName: api.NamespacedName{
+					Name:      new.ObjectMeta().GetName(),
+					Namespace: new.ObjectMeta().GetNamespace(),
+				},
+				TypeFullName: string(new.ProtoReflect().Descriptor().FullName()),
+				FieldViolations: []errors.FieldViolation{
+					{
+						Field:   "finalizer",
+						Message: "New finalizers can't be added after an Object was deleted.",
+					},
+				},
+			}
+		}
+
+		if len(new.ObjectMeta().GetFinalizers()) <
+			len(old.ObjectMeta().GetFinalizers()) ||
+			old.ObjectMeta().GetDeletedTimestamp() == nil &&
+				new.ObjectMeta().GetDeletedTimestamp() != nil {
+			return nil
+		}
+
+		if !reflect.DeepEqual(old, new) {
+			return errors.ErrBadRequest{
+				NamespacedName: api.NamespacedName{
+					Name:      new.ObjectMeta().GetName(),
+					Namespace: new.ObjectMeta().GetNamespace(),
+				},
+				TypeFullName: string(new.ProtoReflect().Descriptor().FullName()),
+				FieldViolations: []errors.FieldViolation{
+					{
+						Message: "Only finalizers can be removed after an Object was deleted.",
+					},
+				},
+			}
+		}
+	}
+
 	newMeta := new.ObjectMeta()
 	if err := validate.ValidateName(newMeta.GetName()); err != nil {
 		return err

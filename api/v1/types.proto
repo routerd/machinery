@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 syntax = "proto3";
-package routerd.machinery.api.v1;
+package machinery.api.v1;
 option go_package = "routerd.net/machinery/api/v1";
 
 import "google/protobuf/timestamp.proto";

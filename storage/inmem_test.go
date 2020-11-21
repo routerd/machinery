@@ -19,15 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package storage
 
 import (
-	"context"
-	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"routerd.net/machinery/api"
-	machineryv1 "routerd.net/machinery/api/v1"
 	testdatav1 "routerd.net/machinery/storage/testdata/v1"
 )
 
@@ -36,97 +30,105 @@ var (
 )
 
 func TestStorage(t *testing.T) {
-	t.Run("Get", func(t *testing.T) {
-		s := NewInMemoryStorage(&testdatav1.TestObject{})
+	s := NewInMemoryStorage(&testdatav1.TestObject{})
 
-		// Run
-		stopCh := make(chan struct{})
-		go s.Run(stopCh)
-		defer close(stopCh)
+	// Run
+	stopCh := make(chan struct{})
+	go s.Run(stopCh)
+	defer close(stopCh)
 
-		ctx := context.Background()
+	StorageTestSuite(t, s)
 
-		// Inject some data
-		require.NoError(t, s.Create(ctx, &testdatav1.TestObject{
-			Meta: &machineryv1.ObjectMeta{
-				Name:      "test123",
-				Namespace: "test",
-			},
-		}))
+	// t.Run("Get", func(t *testing.T) {
 
-		// Get
-		obj := &testdatav1.TestObject{}
-		err := s.Get(ctx, api.NamespacedName{
-			Name: "test123", Namespace: "test",
-		}, obj)
-		require.NoError(t, err)
+	// 	// Run
+	// 	stopCh := make(chan struct{})
+	// 	go s.Run(stopCh)
+	// 	defer close(stopCh)
 
-		assert.Equal(t, "test123", obj.Meta.Name)
-	})
+	// 	ctx := context.Background()
 
-	t.Run("List", func(t *testing.T) {
-		s := NewInMemoryStorage(&testdatav1.TestObject{})
+	// 	// Inject some data
+	// 	require.NoError(t, s.Create(ctx, &testdatav1.TestObject{
+	// 		Meta: &machineryv1.ObjectMeta{
+	// 			Name:      "test123",
+	// 			Namespace: "test",
+	// 		},
+	// 	}))
 
-		// Run
-		stopCh := make(chan struct{})
-		go s.Run(stopCh)
-		defer close(stopCh)
+	// 	// Get
+	// 	obj := &testdatav1.TestObject{}
+	// 	err := s.Get(ctx, api.NamespacedName{
+	// 		Name: "test123", Namespace: "test",
+	// 	}, obj)
+	// 	require.NoError(t, err)
 
-		ctx := context.Background()
+	// 	assert.Equal(t, "test123", obj.Meta.Name)
+	// })
 
-		// Inject some data
-		require.NoError(t, s.Create(ctx, &testdatav1.TestObject{
-			Meta: &machineryv1.ObjectMeta{
-				Name:      "test123",
-				Namespace: "test",
-			},
-		}))
+	// t.Run("List", func(t *testing.T) {
+	// 	s := NewInMemoryStorage(&testdatav1.TestObject{})
 
-		// List
-		list := &testdatav1.TestObjectList{}
-		require.NoError(t, s.List(ctx, list))
+	// 	// Run
+	// 	stopCh := make(chan struct{})
+	// 	go s.Run(stopCh)
+	// 	defer close(stopCh)
 
-		if assert.Len(t, list.Items, 1) {
-			assert.Equal(t, "test123", list.Items[0].Meta.Name)
-		}
-	})
+	// 	ctx := context.Background()
 
-	t.Run("Watch", func(t *testing.T) {
-		s := NewInMemoryStorage(&testdatav1.TestObject{})
+	// 	// Inject some data
+	// 	require.NoError(t, s.Create(ctx, &testdatav1.TestObject{
+	// 		Meta: &machineryv1.ObjectMeta{
+	// 			Name:      "test123",
+	// 			Namespace: "test",
+	// 		},
+	// 	}))
 
-		// Run
-		stopCh := make(chan struct{})
-		go s.Run(stopCh)
-		defer close(stopCh)
+	// 	// List
+	// 	list := &testdatav1.TestObjectList{}
+	// 	require.NoError(t, s.List(ctx, list))
 
-		// Watch
-		ctx := context.Background()
-		watcher, err := s.Watch(ctx, &testdatav1.TestObject{})
-		require.NoError(t, err)
+	// 	if assert.Len(t, list.Items, 1) {
+	// 		assert.Equal(t, "test123", list.Items[0].Meta.Name)
+	// 	}
+	// })
 
-		var events []api.Event
-		var wg sync.WaitGroup
-		wg.Add(1) // wait for 1 event
-		go func() {
-			for event := range watcher.Events() {
-				events = append(events, event)
-				wg.Done()
-			}
-		}()
+	// t.Run("Watch", func(t *testing.T) {
+	// 	s := NewInMemoryStorage(&testdatav1.TestObject{})
 
-		// generate a "Added" event
-		obj := &testdatav1.TestObject{
-			Meta: &machineryv1.ObjectMeta{
-				Name: "test3000", Namespace: "test",
-			},
-		}
-		require.NoError(t, s.Create(ctx, obj))
+	// 	// Run
+	// 	stopCh := make(chan struct{})
+	// 	go s.Run(stopCh)
+	// 	defer close(stopCh)
 
-		// Assertions
-		wg.Wait()
-		if assert.Len(t, events, 1) {
-			assert.Equal(t, api.Event{
-				Type: api.Added, Object: obj}, events[0])
-		}
-	})
+	// 	// Watch
+	// 	ctx := context.Background()
+	// 	watcher, err := s.Watch(ctx, &testdatav1.TestObject{})
+	// 	require.NoError(t, err)
+
+	// 	var events []api.Event
+	// 	var wg sync.WaitGroup
+	// 	wg.Add(1) // wait for 1 event
+	// 	go func() {
+	// 		for event := range watcher.Events() {
+	// 			events = append(events, event)
+	// 			wg.Done()
+	// 		}
+	// 	}()
+
+	// 	// generate a "Added" event
+	// 	obj := &testdatav1.TestObject{
+	// 		Meta: &machineryv1.ObjectMeta{
+	// 			Name: "test3000", Namespace: "test",
+	// 		},
+	// 	}
+	// 	require.NoError(t, s.Create(ctx, obj))
+
+	// 	// Assertions
+	// 	wg.Wait()
+	// 	if assert.Len(t, events, 1) {
+	// 		assert.Equal(t, api.Event{
+	// 			Type: api.Added, Object: obj}, events[0])
+	// 	}
+	// })
 }

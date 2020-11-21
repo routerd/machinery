@@ -108,9 +108,10 @@ $(PROTOCGENGO):
 	@protoc \
 		--go_out=$(PROTO_DIR) --go_opt=paths=source_relative \
 		-I$(TMP)/include \
+		-Iapi/v1 \
 		-I$(PROTO_DIR) $@
 
 .PHONY: proto
-proto: api/**/*.proto
+proto: api/**/*.proto storage/testdata/**/*.proto
 
 FORCE:

@@ -59,7 +59,7 @@ type Writer interface {
 }
 
 type ListOptions struct {
-	Namespace     string
+	Namespace     *string
 	LabelSelector labels.Selector
 }
 
@@ -96,11 +96,12 @@ type UpdateOption interface {
 type InNamespace string
 
 func (n InNamespace) ApplyToList(opt *ListOptions) {
-	opt.Namespace = string(n)
+	ns := string(n)
+	opt.Namespace = &ns
 }
 
 func (n InNamespace) ApplyToWatch(opt *WatchOptions) {
-	opt.Namespace = string(n)
+	n.ApplyToList(&opt.ListOptions)
 }
 
 type MatchLabels map[string]string

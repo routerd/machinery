@@ -29,6 +29,8 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"routerd.net/machinery/api"
 	"routerd.net/machinery/errors"
@@ -40,10 +42,9 @@ type InMemoryStorage struct {
 	objectFullName     protoreflect.FullName
 	listObjectFullName protoreflect.FullName
 	newObject          func() api.Object
-	// newListObject func() ListObject
-	mux      sync.RWMutex
-	data     map[string][]byte
-	sequence uint64
+	mux                sync.RWMutex
+	data               map[string][]byte
+	sequence           uint64
 }
 
 var _ Storage = (*InMemoryStorage)(nil)
@@ -146,6 +147,7 @@ func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...Cr
 	meta.SetGeneration(1)
 	meta.SetResourceVersion(strconv.FormatUint(s.sequence, 10))
 	meta.SetUid(uuid.New().String())
+	meta.SetCreatedTimestamp(timestamppb.Now())
 
 	// Store
 	if err := s.store(obj); err != nil {
@@ -161,6 +163,13 @@ func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...De
 		return err
 	}
 
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	return s.delete(ctx, obj, opts...)
+}
+
+func (s *InMemoryStorage) delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error {
 	// Defaulting
 	// because we don't know what the Validation next is expecting
 	if err := Default(obj); err != nil {
@@ -171,8 +180,11 @@ func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...De
 		return err
 	}
 
-	s.mux.Lock()
-	defer s.mux.Unlock()
+	// Finalizer Handling
+	if len(obj.ObjectMeta().GetFinalizers()) != 0 {
+		obj.ObjectMeta().SetDeletedTimestamp(timestamppb.Now())
+		return s.update(ctx, obj)
+	}
 
 	// Load Existing
 	meta := obj.ObjectMeta()
@@ -195,7 +207,10 @@ func (s *InMemoryStorage) Update(ctx context.Context, obj api.Object, opts ...Up
 
 	s.mux.Lock()
 	defer s.mux.Unlock()
+	return s.update(ctx, obj, opts...)
+}
 
+func (s *InMemoryStorage) update(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
 	// Load Existing
 	meta := obj.ObjectMeta()
 	existingObj := s.newObject()
@@ -212,6 +227,12 @@ func (s *InMemoryStorage) Update(ctx context.Context, obj api.Object, opts ...Up
 	// Validation
 	if err := ValidateUpdate(existingObj, obj); err != nil {
 		return err
+	}
+
+	// Finalizer Handling
+	if obj.ObjectMeta().GetDeletedTimestamp() != nil &&
+		len(obj.ObjectMeta().GetFinalizers()) == 0 {
+		return s.delete(ctx, obj)
 	}
 
 	// Ensure Status is not updated, if the field exists
@@ -265,7 +286,6 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts
 	if err := s.load(key, existingObj); err != nil {
 		return err
 	}
-	existingMeta := existingObj.ObjectMeta()
 
 	// Defaulting
 	if err := Default(obj); err != nil {
@@ -276,32 +296,30 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts
 		return err
 	}
 
-	// Ensure ObjectMeta and Spec is not updated
-	reflect.ValueOf(obj).Elem().FieldByName("ObjectMeta").Set(
-		reflect.ValueOf(existingObj).Elem().FieldByName("ObjectMeta"),
-	)
-	specField := reflect.ValueOf(obj).Elem().FieldByName("Spec")
-	if specField.IsValid() {
-		specField.Set(
-			reflect.ValueOf(existingObj).Elem().FieldByName("Spec"),
+	// Ensure _only_ Status is updated
+	updatedObj := proto.Clone(existingObj).(api.Object)
+	statusField := reflect.ValueOf(updatedObj).Elem().FieldByName("Status")
+	if statusField.IsValid() {
+		statusField.Set(
+			reflect.ValueOf(obj).Elem().FieldByName("Status"),
 		)
 	}
 
 	// Check if there is a change
-	if reflect.DeepEqual(existingObj, obj) {
+	if reflect.DeepEqual(existingObj, updatedObj) {
 		return nil
 	}
 
 	// Ensure correct metadata
 	s.sequence++
-	meta.SetResourceVersion(strconv.FormatUint(s.sequence, 10))
-	meta.SetUid(existingMeta.GetUid())
+	updatedObj.ObjectMeta().
+		SetResourceVersion(strconv.FormatUint(s.sequence, 10))
 
 	// Store
-	if err := s.store(obj); err != nil {
+	if err := s.store(updatedObj); err != nil {
 		return err
 	}
-	s.hub.Broadcast(api.Modified, obj)
+	s.hub.Broadcast(api.Modified, updatedObj)
 	return nil
 }
 
@@ -316,8 +334,8 @@ func (s *InMemoryStorage) list(opts ...ListOption) ([]api.Object, error) {
 
 	var out []api.Object
 	for key, entryData := range s.data {
-		if options.Namespace != "" {
-			if !strings.HasPrefix(key, options.Namespace+"/") {
+		if options.Namespace != nil {
+			if !strings.HasPrefix(key, *options.Namespace+"/") {
 				continue
 			}
 		}
@@ -325,6 +343,13 @@ func (s *InMemoryStorage) list(opts ...ListOption) ([]api.Object, error) {
 		obj := s.newObject()
 		if err := proto.Unmarshal(entryData, obj); err != nil {
 			return nil, err
+		}
+
+		if options.LabelSelector != nil {
+			if !options.LabelSelector.Matches(
+				labels.Set(obj.ObjectMeta().GetLabels())) {
+				continue
+			}
 		}
 		out = append(out, obj)
 	}
