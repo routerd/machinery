@@ -371,8 +371,8 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts
 func (s *InMemoryStorage) list(options ListOptions) ([]api.Object, error) {
 	var out []api.Object
 	for key, entryData := range s.data {
-		if options.Namespace != nil {
-			if !strings.HasPrefix(key, *options.Namespace+"/") {
+		if len(options.Namespace) != 0 {
+			if !strings.HasPrefix(key, options.Namespace+"/") {
 				continue
 			}
 		}

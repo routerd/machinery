@@ -20,16 +20,16 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+
 	"routerd.net/machinery/api"
 	machineryv1 "routerd.net/machinery/api/v1"
-	testdatav1 "routerd.net/machinery/storage/testdata/v1"
+	testdatav1 "routerd.net/machinery/testdata/v1"
 )
 
 func TestInMemoryStorage(t *testing.T) {
@@ -44,14 +44,8 @@ func TestInMemoryStorage(t *testing.T) {
 }
 
 func StorageTestSuite(t *testing.T, s Storage) {
+	t.Helper()
 	ctx := context.Background()
-
-	initObjectNotNamespaced := &testdatav1.TestObject{
-		Meta: &machineryv1.ObjectMeta{
-			Name:      "test-no-namespace",
-			Namespace: "",
-		},
-	}
 
 	initObjectNamespaced := &testdatav1.TestObject{
 		Meta: &machineryv1.ObjectMeta{
@@ -63,7 +57,6 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	// Create
 	// ------
 	createObjects := []*testdatav1.TestObject{
-		initObjectNotNamespaced,
 		initObjectNamespaced,
 		{
 			Meta: &machineryv1.ObjectMeta{
@@ -120,15 +113,6 @@ func StorageTestSuite(t *testing.T, s Storage) {
 
 	assert.Len(t, listAll.Items, len(createObjects))
 
-	// list non-namespaced
-	listNonNamespaced := &testdatav1.TestObjectList{}
-	require.NoError(t, s.List(ctx, listNonNamespaced, InNamespace("")))
-
-	assert.Len(t, listNonNamespaced.Items, 1)
-	if !proto.Equal(createObjects[0], listNonNamespaced.Items[0]) {
-		t.Error("wrong object in non-namespaced list returned")
-	}
-
 	// list in namespace "test"
 	listNamespaced := &testdatav1.TestObjectList{}
 	require.NoError(t, s.List(ctx, listNamespaced, InNamespace("test")))
@@ -143,15 +127,6 @@ func StorageTestSuite(t *testing.T, s Storage) {
 
 	// Get
 	// ---
-
-	// non-namespaced
-	nonNamespacedObj := &testdatav1.TestObject{}
-	require.NoError(t, s.Get(ctx, api.NamespacedName{
-		Name: "test-no-namespace",
-	}, nonNamespacedObj))
-	if !proto.Equal(initObjectNotNamespaced, nonNamespacedObj) {
-		t.Error("wrong object when getting non-namespaced object")
-	}
 
 	// namespaced
 	namespacedObj := &testdatav1.TestObject{}
@@ -226,6 +201,7 @@ func StorageTestSuite(t *testing.T, s Storage) {
 
 	// delete all namespaced objects
 	require.NoError(t, s.DeleteAllOf(ctx, &testdatav1.TestObject{}, InNamespace("test")))
+
 	namespacedListAfterDeletion := &testdatav1.TestObjectList{}
 	require.NoError(t, s.List(ctx, namespacedListAfterDeletion, InNamespace("test")))
 	assert.Len(t, namespacedListAfterDeletion.Items, 0)
@@ -235,43 +211,39 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	time.Sleep(1 * time.Second) // wait for all events to be received
 	watcher.Close()
 
-	require.Len(t, events, 12)
-	// first 5 events should be generated added events from storage
-	for i := 0; i < 5; i++ {
+	require.Len(t, events, 11)
+	// first 4 events should be generated added events from storage
+	for i := 0; i < 4; i++ {
 		assert.Equal(t, api.Added, events[i].Type)
 	}
-	fmt.Println(events)
 
 	// Update test
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "test-namespaced", Namespace: "test",
-	}, api.Modified, events[5])
+	}, api.Modified, events[4])
 
 	// StatusUpdate test
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "test-namespaced", Namespace: "test",
-	}, api.Modified, events[6])
+	}, api.Modified, events[5])
 
 	// Delete test
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "test-namespaced", Namespace: "test",
-	}, api.Deleted, events[7])
+	}, api.Deleted, events[6])
 
 	// Delete finalizer-obj
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "finalizer-obj", Namespace: "test",
-	}, api.Modified, events[8]) // "deleted" but waiting for finalizer
+	}, api.Modified, events[7]) // "deleted" but waiting for finalizer
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "finalizer-obj", Namespace: "test",
-	}, api.Deleted, events[9]) // deleted, -> finalizer removed
+	}, api.Deleted, events[8]) // deleted, -> finalizer removed
 
 	// Rest of Namespaced object (DeleteAllOf)
-	assertEventTypeAndNamespaceName(t, api.NamespacedName{
-		Name: "test-obj-1", Namespace: "test",
-	}, api.Deleted, events[10])
-	assertEventTypeAndNamespaceName(t, api.NamespacedName{
-		Name: "test-obj-2", Namespace: "test",
-	}, api.Deleted, events[11])
+	for i := 0; i < 2; i++ {
+		assert.Equal(t, api.Deleted, events[i+9].Type)
+	}
 }
 
 func assertEventTypeAndNamespaceName(

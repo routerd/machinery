@@ -36,10 +36,6 @@ message ObjectMeta {
   google.protobuf.Timestamp deletedTimestamp = 10;
 }
 
-message Namespace {
-  ObjectMeta meta = 1;
-}
-
 message Event {
   string type = 1;
   google.protobuf.Any object = 2;
@@ -49,4 +45,42 @@ message Status {
   int32 code = 1;
   string message = 2;
   repeated google.protobuf.Any details = 3;
+}
+
+message Namespace {
+  ObjectMeta meta = 1;
+}
+
+message NamespaceList {
+  // List meta = 1;
+  repeated Namespace items = 2;
+}
+
+message GetRequest {
+  string name = 1;
+}
+
+message ListRequest {
+  string namespace = 1;
+  string labelSelector = 2;
+}
+
+message WatchRequest {
+  string namespace = 1;
+  string labelSelector = 2;
+}
+
+message DeleteAllOfRequest {
+  string namespace = 1;
+  string labelSelector = 2;
+}
+
+service NamespaceService {
+  rpc Get(GetRequest) returns (Namespace) {};
+  rpc List(ListRequest) returns (NamespaceList) {};
+  rpc Watch(WatchRequest) returns (stream Event) {};
+  rpc Create(Namespace) returns (Namespace) {};
+  rpc Update(Namespace) returns (Namespace) {};
+  rpc Delete(Namespace) returns (Namespace) {};
+  rpc DeleteAllOf(DeleteAllOfRequest) returns (Status) {};
 }

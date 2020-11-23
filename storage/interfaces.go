@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+
 	"routerd.net/machinery/api"
 )
 
@@ -36,7 +37,7 @@ type Storage interface {
 // Reader provides read methods for storage access.
 type Reader interface {
 	Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error
-	List(ctx context.Context, obj api.ListObject, opts ...ListOption) error
+	List(ctx context.Context, listObj api.ListObject, opts ...ListOption) error
 }
 
 type WatchClient interface {
@@ -60,7 +61,7 @@ type Writer interface {
 }
 
 type ListOptions struct {
-	Namespace     *string
+	Namespace     string
 	LabelSelector labels.Selector
 }
 
@@ -107,7 +108,7 @@ type InNamespace string
 
 func (n InNamespace) ApplyToList(opt *ListOptions) {
 	ns := string(n)
-	opt.Namespace = &ns
+	opt.Namespace = ns
 }
 
 func (n InNamespace) ApplyToWatch(opt *WatchOptions) {

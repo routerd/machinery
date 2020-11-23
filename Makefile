@@ -112,6 +112,6 @@ $(PROTOCGENGO):
 		-I$(PROTO_DIR) $@
 
 .PHONY: proto
-proto: api/**/*.proto storage/testdata/**/*.proto
+proto: api/**/*.proto testdata/**/*.proto
 
 FORCE:

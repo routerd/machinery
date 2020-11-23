@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 syntax = "proto3";
 package machinery.testdata.v1;
-option go_package = "routerd.net/machinery/storage/testdata/api/v1";
+option go_package = "routerd.net/machinery/testdata/api/v1";
 
 import "types.proto";
 
@@ -35,4 +35,14 @@ message TestObjectStatus {
 
 message TestObjectList {
   repeated TestObject items = 1;
+}
+
+service TestObjectService {
+  rpc Get(machinery.api.v1.GetRequest) returns (TestObject) {};
+  rpc List(machinery.api.v1.ListRequest) returns (TestObjectList) {};
+  rpc Watch(machinery.api.v1.WatchRequest) returns (stream machinery.api.v1.Event) {};
+  rpc Create(TestObject) returns (TestObject) {};
+  rpc Update(TestObject) returns (TestObject) {};
+  rpc Delete(TestObject) returns (TestObject) {};
+  rpc DeleteAllOf(machinery.api.v1.DeleteAllOfRequest) returns (machinery.api.v1.Status) {};
 }
