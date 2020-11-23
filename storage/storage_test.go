@@ -20,8 +20,8 @@ package storage
 
 import (
 	"context"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,10 +97,15 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	require.NoError(t, err)
 	defer watcher.Close()
 
-	var events []api.ResourceEvent
+	var (
+		eventsWG sync.WaitGroup
+		events   []api.ResourceEvent
+	)
+	eventsWG.Add(13) // we expect 13 events from start to finish
 	go func() {
 		for event := range watcher.Events() {
 			events = append(events, event)
+			eventsWG.Done()
 		}
 	}()
 
@@ -219,7 +224,9 @@ func StorageTestSuite(t *testing.T, s Storage) {
 
 	// Check Events
 	// ------------
-	time.Sleep(1 * time.Second) // wait for all events to be received
+
+	// wait for all events to be received
+	eventsWG.Wait()
 	watcher.Close()
 
 	require.Len(t, events, 13)
