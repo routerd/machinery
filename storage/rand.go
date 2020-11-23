@@ -16,13 +16,29 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package storage
 
-type EventType string
+import (
+	"math/rand"
+	"time"
+)
+
+var r *rand.Rand
 
 const (
-	Added    EventType = "Added"
-	Modified EventType = "Modified"
-	Deleted  EventType = "Deleted"
-	Error    EventType = "Error"
+	suffixLength = 4
+	charset      = "abcdefghijklmnopqrstuvwxyz" +
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
+
+func generateNameSuffix() string {
+	c := make([]byte, suffixLength)
+	for i := range c {
+		c[i] = charset[r.Intn(len(c))]
+	}
+	return string(c)
+}
+
+func init() {
+	r = rand.New(rand.NewSource(time.Now().UnixNano()))
+}

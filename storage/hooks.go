@@ -100,30 +100,58 @@ func ValidateUpdate(old, new api.Object) error {
 			}
 		}
 
+		// Allow to remove Finalizers
 		if len(new.ObjectMeta().GetFinalizers()) <
-			len(old.ObjectMeta().GetFinalizers()) ||
-			old.ObjectMeta().GetDeletedTimestamp() == nil &&
-				new.ObjectMeta().GetDeletedTimestamp() != nil {
+			len(old.ObjectMeta().GetFinalizers()) {
 			return nil
 		}
 
-		if !reflect.DeepEqual(old, new) {
-			return errors.ErrBadRequest{
-				NamespacedName: api.NamespacedName{
-					Name:      new.ObjectMeta().GetName(),
-					Namespace: new.ObjectMeta().GetNamespace(),
+		// Allow to mark an object as deleted if at least one finalizer is set.
+		if len(new.ObjectMeta().GetFinalizers()) > 0 &&
+			old.ObjectMeta().GetDeletedTimestamp() == nil &&
+			new.ObjectMeta().GetDeletedTimestamp() != nil {
+			return nil
+		}
+
+		// noop -> skip
+		if reflect.DeepEqual(old, new) {
+			return nil
+		}
+
+		return errors.ErrBadRequest{
+			NamespacedName: api.NamespacedName{
+				Name:      new.ObjectMeta().GetName(),
+				Namespace: new.ObjectMeta().GetNamespace(),
+			},
+			TypeFullName: string(new.ProtoReflect().Descriptor().FullName()),
+			FieldViolations: []errors.FieldViolation{
+				{
+					Field:   ".",
+					Message: "Object termination in progress. Only removal of finalizers is allowed.",
 				},
-				TypeFullName: string(new.ProtoReflect().Descriptor().FullName()),
-				FieldViolations: []errors.FieldViolation{
-					{
-						Message: "Only finalizers can be removed after an Object was deleted.",
-					},
-				},
-			}
+			},
 		}
 	}
 
 	newMeta := new.ObjectMeta()
+
+	// GenerateName cannot be updated
+	if old.ObjectMeta().GetGenerateName() != newMeta.GetGenerateName() {
+		return errors.ErrBadRequest{
+			NamespacedName: api.NamespacedName{
+				Name:      new.ObjectMeta().GetName(),
+				Namespace: new.ObjectMeta().GetNamespace(),
+			},
+			TypeFullName: string(new.ProtoReflect().Descriptor().FullName()),
+			FieldViolations: []errors.FieldViolation{
+				{
+					Field:   ".meta.generateName",
+					Message: "Field is immutable.",
+				},
+			},
+		}
+	}
+
 	if err := validate.ValidateName(newMeta.GetName()); err != nil {
 		return err
 	}

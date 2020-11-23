@@ -139,13 +139,27 @@ func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...Cr
 	if err := Default(obj); err != nil {
 		return err
 	}
+
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	// Generate Name handling
+	if len(obj.ObjectMeta().GetName()) == 0 &&
+		len(obj.ObjectMeta().GetGenerateName()) > 0 {
+		for {
+			name := obj.ObjectMeta().GetGenerateName() + generateNameSuffix()
+			key := api.NamespacedName{Name: name, Namespace: obj.ObjectMeta().GetNamespace()}
+			if _, ok := s.data[key.String()]; !ok {
+				obj.ObjectMeta().SetName(name)
+				break
+			}
+		}
+	}
+
 	// Validation
 	if err := ValidateCreate(obj); err != nil {
 		return err
 	}
-
-	s.mux.Lock()
-	defer s.mux.Unlock()
 
 	meta := obj.ObjectMeta()
 	key := api.NamespacedName{Name: meta.GetName(), Namespace: meta.GetNamespace()}

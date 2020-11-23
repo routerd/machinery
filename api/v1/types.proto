@@ -23,28 +23,74 @@ option go_package = "routerd.net/machinery/api/v1";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 
+// Common Object Metadata.
+// Every API Object SHOULD use this common metadata object,
+// instead relying of custom definitions.
 message ObjectMeta {
+  // Unique ID, set server-side.
+  // May be used to tell different revisions of objects with the same name apart.
   string uid = 1;
+  // (Namespace) Unique name assigned to this object by the client.
+  // Validated as RFC1035 DNS Label
   string name = 2;
+  // Namespace this object belongs into.
+  // Object names are unique to their namespace.
+  // Objects MUST choose to be EITHER non-namespaced (making this field always empty) or
+  // namespaced (requiring this field to be always supplied).
+  // Validated as RFC1035 DNS Subdomain
   string namespace = 3;
+  // Labels can be used to group objects for List calls, see LabelSelector in ListRequest.
   map<string, string> labels = 4;
+  // Annotations can store arbitrary data to support custom API extensions or
+  // information to be attached to an object, without requiring API alterations.
   map<string, string> annotations = 5;
+  // ResourceVersion tracks the revision of the whole object and is updated on every change to the object.
+  // On Update and UpdateStatus calls the supplied ResourceVersion MUST match with the ResourceVersion in the database or
+  // a Conflict Error will be returned. Apply your changes to the latest object revision to resolve this error.
   string resourceVersion = 6;
+  // Generation is incremented on changes to the Object Specification or Metadata (all fields except .status).
+  // It is NOT updated on changes below the .status key.
   int64 generation = 7;
+  // Finalizers delay cleanup of the object from storage and allow clients to implement custom cleanup logic.
+  // When Finalizers are present on an object, the Delete operation will only mark the object as deleted,
+  // by setting the DeletedTimestamp. After DeletedTimestamp is set are only allowed, when they remove one or more Finalizers.
+  // When the last Finalizer is removed the object is deleted from storage.
   repeated string finalizers = 8;
+  // Time this object was created.
   google.protobuf.Timestamp createdTimestamp = 9;
+  // Time this object was deleted (see finalizers).
   google.protobuf.Timestamp deletedTimestamp = 10;
+  // MAY be specified instead of the Name field to let the server generate a name for the object.
+  // Given string is used as prefix. e.g. "test-obj-" -> "test-obj-xxx"
+  string generateName = 11;
 }
 
-message Event {
+// ResourceEvent informs clients about changes to stored objects.
+message ResourceEvent {
+  // Type is one of "Added", "Modified", "Deleted", "Error"
+  // Object is of type Status, when Type == "Error" and MAY contain additional Error information.
   string type = 1;
+  // Affected object.
+  // "Added": New Object as commited to storage.
+  // "Modified": Modified objects as commited to storage.
+  // "Deleted": Object state right before deletion.
   google.protobuf.Any object = 2;
 }
 
+// Status contains information about the call status.
+// may be returned when an API call would be void or in case of an error.
 message Status {
+  // Code is the suggested HTTP Error code for this status.
   int32 code = 1;
-  string message = 2;
-  repeated google.protobuf.Any details = 3;
+  // Machine readable reason for this status.
+  // Reason MUST be UpperCamelCased and MUST not contain spaces or special characters.
+  // e.g. Success, ValidationError, RequestTimeout, ...
+  string reason = 2;
+  // Human readable reason for this status.
+  string message = 3;
+  // Additional error details
+  // Types SHOULD stay consistent for the same Reason.
+  repeated google.protobuf.Any details = 4;
 }
 
 message Namespace {
@@ -78,7 +124,7 @@ message DeleteAllOfRequest {
 service NamespaceService {
   rpc Get(GetRequest) returns (Namespace) {};
   rpc List(ListRequest) returns (NamespaceList) {};
-  rpc Watch(WatchRequest) returns (stream Event) {};
+  rpc Watch(WatchRequest) returns (stream ResourceEvent) {};
   rpc Create(Namespace) returns (Namespace) {};
   rpc Update(Namespace) returns (Namespace) {};
   rpc Delete(Namespace) returns (Namespace) {};

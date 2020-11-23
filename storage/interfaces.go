@@ -42,7 +42,7 @@ type Reader interface {
 
 type WatchClient interface {
 	Close() error
-	Events() <-chan api.Event
+	Events() <-chan api.ResourceEvent
 }
 
 // Watcher can be used to watch for to the specified object type.

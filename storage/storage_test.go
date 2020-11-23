@@ -97,12 +97,23 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	require.NoError(t, err)
 	defer watcher.Close()
 
-	var events []api.Event
+	var events []api.ResourceEvent
 	go func() {
 		for event := range watcher.Events() {
 			events = append(events, event)
 		}
 	}()
+
+	// Create (generateName)
+	// ------
+	generateNameObj := &testdatav1.TestObject{
+		Meta: &machineryv1.ObjectMeta{
+			GenerateName: "test-",
+			Namespace:    "test",
+		},
+	}
+	require.NoError(t, s.Create(ctx, generateNameObj))
+	assert.NotEmpty(t, generateNameObj.Meta.Name)
 
 	// List
 	// ----
@@ -111,13 +122,13 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	listAll := &testdatav1.TestObjectList{}
 	require.NoError(t, s.List(ctx, listAll))
 
-	assert.Len(t, listAll.Items, len(createObjects))
+	assert.Len(t, listAll.Items, len(createObjects)+1)
 
 	// list in namespace "test"
 	listNamespaced := &testdatav1.TestObjectList{}
 	require.NoError(t, s.List(ctx, listNamespaced, InNamespace("test")))
 
-	assert.Len(t, listNamespaced.Items, 4)
+	assert.Len(t, listNamespaced.Items, 5)
 
 	// list by label match
 	listWithLabel := &testdatav1.TestObjectList{}
@@ -211,43 +222,43 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	time.Sleep(1 * time.Second) // wait for all events to be received
 	watcher.Close()
 
-	require.Len(t, events, 11)
-	// first 4 events should be generated added events from storage
-	for i := 0; i < 4; i++ {
+	require.Len(t, events, 13)
+	// first 5 events should be generated added events from storage
+	for i := 0; i < 5; i++ {
 		assert.Equal(t, api.Added, events[i].Type)
 	}
 
 	// Update test
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "test-namespaced", Namespace: "test",
-	}, api.Modified, events[4])
+	}, api.Modified, events[5])
 
 	// StatusUpdate test
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "test-namespaced", Namespace: "test",
-	}, api.Modified, events[5])
+	}, api.Modified, events[6])
 
 	// Delete test
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "test-namespaced", Namespace: "test",
-	}, api.Deleted, events[6])
+	}, api.Deleted, events[7])
 
 	// Delete finalizer-obj
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "finalizer-obj", Namespace: "test",
-	}, api.Modified, events[7]) // "deleted" but waiting for finalizer
+	}, api.Modified, events[8]) // "deleted" but waiting for finalizer
 	assertEventTypeAndNamespaceName(t, api.NamespacedName{
 		Name: "finalizer-obj", Namespace: "test",
-	}, api.Deleted, events[8]) // deleted, -> finalizer removed
+	}, api.Deleted, events[9]) // deleted, -> finalizer removed
 
 	// Rest of Namespaced object (DeleteAllOf)
-	for i := 0; i < 2; i++ {
-		assert.Equal(t, api.Deleted, events[i+9].Type)
+	for i := 0; i < 3; i++ {
+		assert.Equal(t, api.Deleted, events[i+10].Type)
 	}
 }
 
 func assertEventTypeAndNamespaceName(
-	t *testing.T, nn api.NamespacedName, et api.EventType, e api.Event) {
+	t *testing.T, nn api.NamespacedName, et api.ResourceEventType, e api.ResourceEvent) {
 	if e.Type != et {
 		t.Errorf("event type should be %q, is %q, event: %v", et, e.Type, e)
 	}

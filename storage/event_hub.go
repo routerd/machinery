@@ -33,7 +33,7 @@ type indexedBuffer interface {
 }
 
 type event struct {
-	Type            api.EventType
+	Type            api.ResourceEventType
 	Object          api.Object
 	ResourceVersion string
 }
@@ -63,7 +63,7 @@ func NewHub(list ListerFn) *eventHub {
 	}
 }
 
-func (h *eventHub) Broadcast(eventType api.EventType, obj api.Object) {
+func (h *eventHub) Broadcast(eventType api.ResourceEventType, obj api.Object) {
 	e := event{
 		Type:            eventType,
 		Object:          obj,
@@ -99,7 +99,7 @@ func (h *eventHub) Run(stopCh <-chan struct{}) {
 			h.closeEventClient(c)
 
 		case event := <-h.broadcast:
-			e := api.Event{
+			e := api.ResourceEvent{
 				Type:   event.Type,
 				Object: event.Object,
 			}
@@ -138,7 +138,7 @@ func (h *eventHub) seed(c EventClient) {
 				continue
 			}
 
-			e := obj.(*api.Event)
+			e := obj.(*api.ResourceEvent)
 			c.eventSink() <- *e
 		}
 		return
@@ -153,7 +153,7 @@ func (h *eventHub) seed(c EventClient) {
 		return
 	}
 	for _, obj := range objects {
-		c.eventSink() <- api.Event{
+		c.eventSink() <- api.ResourceEvent{
 			Type:   api.Added,
 			Object: obj,
 		}

@@ -20,12 +20,20 @@ package v1
 
 import "google.golang.org/protobuf/types/known/timestamppb"
 
-func (m *ObjectMeta) SetLabels(labels map[string]string) {
-	m.Labels = labels
-}
-
 func (m *ObjectMeta) SetUid(uid string) {
 	m.Uid = uid
+}
+
+func (m *ObjectMeta) SetNamespace(namespace string) {
+	m.Namespace = namespace
+}
+
+func (m *ObjectMeta) SetName(name string) {
+	m.Name = name
+}
+
+func (m *ObjectMeta) SetLabels(labels map[string]string) {
+	m.Labels = labels
 }
 
 func (m *ObjectMeta) SetResourceVersion(resourceVersion string) {
@@ -48,7 +56,6 @@ func (m *ObjectMeta) SetGeneration(generation int64) {
 	m.Generation = generation
 }
 
-type NamespacedName struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
+func (m *ObjectMeta) SetGenerateName(generateName string) {
+	m.GenerateName = generateName
 }

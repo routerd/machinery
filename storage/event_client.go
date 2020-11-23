@@ -26,10 +26,10 @@ import (
 
 // EventClient represents a client connection to the event hub.
 type EventClient interface {
-	Events() <-chan api.Event
+	Events() <-chan api.ResourceEvent
 	Close() error
 
-	eventSink() chan<- api.Event
+	eventSink() chan<- api.ResourceEvent
 	options() ListOptions
 	resourceVersion() string
 	error(error)
@@ -40,7 +40,7 @@ type EventClient interface {
 var _ EventClient = (*eventClient)(nil)
 
 type eventClient struct {
-	eventCh    chan api.Event
+	eventCh    chan api.ResourceEvent
 	rv         string
 	opts       ListOptions
 	err        error
@@ -56,7 +56,7 @@ func newEventClient(
 	deregister chan<- EventClient,
 ) *eventClient {
 	return &eventClient{
-		eventCh:    make(chan api.Event, bufferSize),
+		eventCh:    make(chan api.ResourceEvent, bufferSize),
 		initCh:     make(chan struct{}),
 		rv:         resourceVersion,
 		opts:       opts,
@@ -71,7 +71,7 @@ func (c *eventClient) Close() error {
 	return nil
 }
 
-func (c *eventClient) Events() <-chan api.Event {
+func (c *eventClient) Events() <-chan api.ResourceEvent {
 	return c.eventCh
 }
 
@@ -79,7 +79,7 @@ func (c *eventClient) error(err error) {
 	c.err = err
 }
 
-func (c *eventClient) eventSink() chan<- api.Event {
+func (c *eventClient) eventSink() chan<- api.ResourceEvent {
 	return c.eventCh
 }
 

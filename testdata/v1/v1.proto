@@ -40,7 +40,7 @@ message TestObjectList {
 service TestObjectService {
   rpc Get(machinery.api.v1.GetRequest) returns (TestObject) {};
   rpc List(machinery.api.v1.ListRequest) returns (TestObjectList) {};
-  rpc Watch(machinery.api.v1.WatchRequest) returns (stream machinery.api.v1.Event) {};
+  rpc Watch(machinery.api.v1.WatchRequest) returns (stream machinery.api.v1.ResourceEvent) {};
   rpc Create(TestObject) returns (TestObject) {};
   rpc Update(TestObject) returns (TestObject) {};
   rpc Delete(TestObject) returns (TestObject) {};

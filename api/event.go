@@ -18,17 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package api
 
-// Event is emitted for every change of an object in storage.
-type Event struct {
-	Type   EventType
+// ResourceEvent is emitted for every change of an object in storage.
+type ResourceEvent struct {
+	Type   ResourceEventType
 	Object Object
 }
 
-type EventType string
+type ResourceEventType string
 
 const (
-	Added    EventType = "Added"
-	Modified EventType = "Modified"
-	Deleted  EventType = "Deleted"
-	Error    EventType = "Error"
+	Added    ResourceEventType = "Added"
+	Modified ResourceEventType = "Modified"
+	Deleted  ResourceEventType = "Deleted"
+	Error    ResourceEventType = "Error"
 )

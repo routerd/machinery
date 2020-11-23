@@ -31,8 +31,10 @@ type Object interface {
 type ObjectMeta interface {
 	// GetName returns a unique, user defined ID for the object.
 	GetName() string
+	SetName(string)
 	// GetNamespace returns the "keyspace" or "folder" of this object.
 	GetNamespace() string
+	SetNamespace(string)
 
 	// GetLabels returns a set of labels that can be used to filter and group objects.
 	GetLabels() map[string]string
@@ -66,6 +68,9 @@ type ObjectMeta interface {
 	// Generation is incremented for every non-status update to this object.
 	GetGeneration() int64
 	SetGeneration(int64)
+
+	GetGenerateName() string
+	SetGenerateName(string)
 }
 
 type ListObject interface {
