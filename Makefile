@@ -126,8 +126,8 @@ $(PROTOCGENGOGRPC):
 	@test -s $(PROTO_FILEBASE)_grpc.pb.go && \
 		cat hack/boilerplate/boilerplate.generatego.txt | sed s/YEAR/2020/ > $(PROTO_FILEBASE)_grpc.pb.go.tmp && \
 		cat $(PROTO_FILEBASE)_grpc.pb.go >> $(PROTO_FILEBASE)_grpc.pb.go.tmp && \
-		goimports -local routerd.net -w $(PROTO_FILEBASE)_grpc.pb.go && \
-		mv $(PROTO_FILEBASE)_grpc.pb.go.tmp $(PROTO_FILEBASE)_grpc.pb.go || \
+		mv $(PROTO_FILEBASE)_grpc.pb.go.tmp $(PROTO_FILEBASE)_grpc.pb.go && \
+		goimports -local routerd.net -w $(PROTO_FILEBASE)_grpc.pb.go || \
 		true
 
 	@goimports -local routerd.net -w $(PROTO_FILEBASE).pb.go
