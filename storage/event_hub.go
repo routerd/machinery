@@ -25,7 +25,7 @@ import (
 )
 
 // ListerFn is used to get all existing objects to seed new clients with "Add" events.
-type ListerFn func(opts ListOptions) ([]api.Object, error)
+type ListerFn func(opts api.ListOptions) ([]api.Object, error)
 
 type indexedBuffer interface {
 	Append(index string, value interface{})
@@ -73,7 +73,7 @@ func (h *eventHub) Broadcast(eventType api.ResourceEventType, obj api.Object) {
 }
 
 func (h *eventHub) Register(
-	resourceVersion string, opts ListOptions,
+	resourceVersion string, opts api.ListOptions,
 ) (EventClient, error) {
 	c := newEventClient(50, resourceVersion, opts, h.deregister)
 	h.register <- c

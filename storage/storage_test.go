@@ -43,7 +43,7 @@ func TestInMemoryStorage(t *testing.T) {
 	StorageTestSuite(t, s)
 }
 
-func StorageTestSuite(t *testing.T, s Storage) {
+func StorageTestSuite(t *testing.T, s api.Client) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -131,13 +131,13 @@ func StorageTestSuite(t *testing.T, s Storage) {
 
 	// list in namespace "test"
 	listNamespaced := &testdatav1.TestObjectList{}
-	require.NoError(t, s.List(ctx, listNamespaced, InNamespace("test")))
+	require.NoError(t, s.List(ctx, listNamespaced, api.InNamespace("test")))
 
 	assert.Len(t, listNamespaced.Items, 5)
 
 	// list by label match
 	listWithLabel := &testdatav1.TestObjectList{}
-	require.NoError(t, s.List(ctx, listWithLabel, MatchLabels{"test": "1"}))
+	require.NoError(t, s.List(ctx, listWithLabel, api.MatchLabels{"test": "1"}))
 
 	assert.Len(t, listWithLabel.Items, 1)
 
@@ -216,10 +216,10 @@ func StorageTestSuite(t *testing.T, s Storage) {
 	// -----------
 
 	// delete all namespaced objects
-	require.NoError(t, s.DeleteAllOf(ctx, &testdatav1.TestObject{}, InNamespace("test")))
+	require.NoError(t, s.DeleteAllOf(ctx, &testdatav1.TestObject{}, api.InNamespace("test")))
 
 	namespacedListAfterDeletion := &testdatav1.TestObjectList{}
-	require.NoError(t, s.List(ctx, namespacedListAfterDeletion, InNamespace("test")))
+	require.NoError(t, s.List(ctx, namespacedListAfterDeletion, api.InNamespace("test")))
 	assert.Len(t, namespacedListAfterDeletion.Items, 0)
 
 	// Check Events

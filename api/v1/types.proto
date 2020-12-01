@@ -93,14 +93,14 @@ message Status {
   repeated google.protobuf.Any details = 4;
 }
 
-message Namespace {
-  ObjectMeta meta = 1;
-}
+// message Namespace {
+//   ObjectMeta meta = 1;
+// }
 
-message NamespaceList {
-  // List meta = 1;
-  repeated Namespace items = 2;
-}
+// message NamespaceList {
+//   // List meta = 1;
+//   repeated Namespace items = 2;
+// }
 
 message GetRequest {
   string name = 1;
@@ -121,12 +121,12 @@ message DeleteAllOfRequest {
   string labelSelector = 2;
 }
 
-service NamespaceService {
-  rpc Get(GetRequest) returns (Namespace) {};
-  rpc List(ListRequest) returns (NamespaceList) {};
-  rpc Watch(WatchRequest) returns (stream ResourceEvent) {};
-  rpc Create(Namespace) returns (Namespace) {};
-  rpc Update(Namespace) returns (Namespace) {};
-  rpc Delete(Namespace) returns (Namespace) {};
-  rpc DeleteAllOf(DeleteAllOfRequest) returns (Status) {};
-}
+// service NamespaceService {
+//   rpc Get(GetRequest) returns (Namespace) {};
+//   rpc List(ListRequest) returns (NamespaceList) {};
+//   rpc Watch(WatchRequest) returns (stream ResourceEvent) {};
+//   rpc Create(Namespace) returns (Namespace) {};
+//   rpc Update(Namespace) returns (Namespace) {};
+//   rpc Delete(Namespace) returns (Namespace) {};
+//   rpc DeleteAllOf(DeleteAllOfRequest) returns (Status) {};
+// }

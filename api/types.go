@@ -23,5 +23,8 @@ type NamespacedName struct {
 }
 
 func (nn NamespacedName) String() string {
+	if len(nn.Namespace) == 0 {
+		return nn.Name
+	}
 	return nn.Namespace + "/" + nn.Name
 }

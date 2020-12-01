@@ -24,28 +24,32 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"routerd.net/machinery/api"
 )
 
 type NamespacedStorage struct {
 	namespaceType   protoreflect.FullName
-	typeStorages    map[protoreflect.FullName]Storage
+	newNamespace    func() api.Object
+	typeStorages    map[protoreflect.FullName]api.Client
 	namespacedTypes map[protoreflect.FullName]struct{}
 }
 
 func NewNamespacedStorage(
-	namespaceType protoreflect.FullName,
-) (*NamespacedStorage, error) {
+	namespaceObj api.Object,
+) *NamespacedStorage {
 	return &NamespacedStorage{
-		namespaceType:   namespaceType,
-		typeStorages:    map[protoreflect.FullName]Storage{},
+		namespaceType: namespaceObj.ProtoReflect().Descriptor().FullName(),
+		newNamespace: func() api.Object {
+			return namespaceObj.
+				ProtoReflect().New().Interface().(api.Object)
+		},
+		typeStorages:    map[protoreflect.FullName]api.Client{},
 		namespacedTypes: map[protoreflect.FullName]struct{}{},
-	}, nil
+	}
 }
 
-func (s *NamespacedStorage) storage(objType protoreflect.FullName) (Storage, error) {
+func (s *NamespacedStorage) storage(objType protoreflect.FullName) (api.Client, error) {
 	typeStorage, ok := s.typeStorages[objType]
 	if !ok {
 		return nil, fmt.Errorf("unknown type %q", objType)
@@ -56,11 +60,6 @@ func (s *NamespacedStorage) storage(objType protoreflect.FullName) (Storage, err
 func (s *NamespacedStorage) validNamespace(
 	ctx context.Context, objType protoreflect.FullName, namespace string) (ns api.Object, err error) {
 	if len(namespace) == 0 {
-		if objType == s.namespaceType {
-			return nil, fmt.
-				Errorf("namespace objects cannot be namespaced.")
-		}
-
 		if _, ok := s.namespacedTypes[objType]; ok {
 			return nil, fmt.
 				Errorf("objects of type %q need to have a namespace specified.", objType)
@@ -68,6 +67,9 @@ func (s *NamespacedStorage) validNamespace(
 
 		// object is not namespaced
 		return nil, nil
+	} else if objType == s.namespaceType {
+		return nil, fmt.
+			Errorf("namespace objects cannot be namespaced.")
 	}
 
 	namespaceStorage, err := s.storage(s.namespaceType)
@@ -75,19 +77,21 @@ func (s *NamespacedStorage) validNamespace(
 		return nil, err
 	}
 
-	namespaceMsgType, err := protoregistry.
-		GlobalTypes.FindMessageByName(s.namespaceType)
-	if err != nil {
-		return nil, err
-	}
-
-	ns = namespaceMsgType.New().(api.Object)
+	ns = s.newNamespace()
 	if err := namespaceStorage.Get(ctx, api.NamespacedName{
 		Name: namespace,
 	}, ns); err != nil {
 		return nil, err
 	}
 	return ns, nil
+}
+
+func (s *NamespacedStorage) RegisterStorage(obj api.Object, typeStorage api.Client, namespaced bool) {
+	objType := obj.ProtoReflect().Descriptor().FullName()
+	s.typeStorages[objType] = typeStorage
+	if namespaced {
+		s.namespacedTypes[objType] = struct{}{}
+	}
 }
 
 func (s *NamespacedStorage) Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error {
@@ -102,17 +106,19 @@ func (s *NamespacedStorage) Get(ctx context.Context, nn api.NamespacedName, obj 
 	return typeStorage.Get(ctx, nn, obj)
 }
 
-func (s *NamespacedStorage) List(ctx context.Context, listObj api.ListObject, opts ...ListOption) error {
+func (s *NamespacedStorage) List(ctx context.Context, listObj api.ListObject, opts ...api.ListOption) error {
 	objType := protoreflect.FullName(strings.TrimSuffix(
 		string(listObj.ProtoReflect().Descriptor().FullName()), "List"))
 
-	var listOptions ListOptions
+	var listOptions api.ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&listOptions)
 	}
-	if _, err := s.validNamespace(
-		ctx, objType, listOptions.Namespace); err != nil {
-		return err
+	if len(listOptions.Namespace) > 0 {
+		if _, err := s.validNamespace(
+			ctx, objType, listOptions.Namespace); err != nil {
+			return err
+		}
 	}
 	typeStorage, err := s.storage(objType)
 	if err != nil {
@@ -121,16 +127,19 @@ func (s *NamespacedStorage) List(ctx context.Context, listObj api.ListObject, op
 	return typeStorage.List(ctx, listObj, opts...)
 }
 
-func (s *NamespacedStorage) Watch(ctx context.Context, obj api.Object, opts ...ListOption) (WatchClient, error) {
+func (s *NamespacedStorage) Watch(ctx context.Context, obj api.Object, opts ...api.ListOption) (api.WatchClient, error) {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 
-	var listOptions ListOptions
+	var listOptions api.ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&listOptions)
 	}
-	if _, err := s.validNamespace(
-		ctx, objType, listOptions.Namespace); err != nil {
-		return nil, err
+	if len(listOptions.Namespace) > 0 {
+		// Namespace is a filter here, so not specifying it is ok
+		if _, err := s.validNamespace(
+			ctx, objType, listOptions.Namespace); err != nil {
+			return nil, err
+		}
 	}
 	typeStorage, err := s.storage(objType)
 	if err != nil {
@@ -139,7 +148,7 @@ func (s *NamespacedStorage) Watch(ctx context.Context, obj api.Object, opts ...L
 	return typeStorage.Watch(ctx, obj, opts...)
 }
 
-func (s *NamespacedStorage) Create(ctx context.Context, obj api.Object, opts ...CreateOption) error {
+func (s *NamespacedStorage) Create(ctx context.Context, obj api.Object, opts ...api.CreateOption) error {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 	if ns, err := s.validNamespace(ctx, objType, obj.ObjectMeta().GetNamespace()); err != nil {
 		return err
@@ -153,7 +162,7 @@ func (s *NamespacedStorage) Create(ctx context.Context, obj api.Object, opts ...
 	return typeStorage.Create(ctx, obj, opts...)
 }
 
-func (s *NamespacedStorage) Delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error {
+func (s *NamespacedStorage) Delete(ctx context.Context, obj api.Object, opts ...api.DeleteOption) error {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 	if _, err := s.validNamespace(ctx, objType, obj.ObjectMeta().GetNamespace()); err != nil {
 		return err
@@ -165,16 +174,19 @@ func (s *NamespacedStorage) Delete(ctx context.Context, obj api.Object, opts ...
 	return typeStorage.Delete(ctx, obj, opts...)
 }
 
-func (s *NamespacedStorage) DeleteAllOf(ctx context.Context, obj api.Object, opts ...DeleteAllOfOption) error {
+func (s *NamespacedStorage) DeleteAllOf(ctx context.Context, obj api.Object, opts ...api.DeleteAllOfOption) error {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 
-	var deleteAllOfOptions DeleteAllOfOptions
+	var deleteAllOfOptions api.DeleteAllOfOptions
 	for _, opt := range opts {
 		opt.ApplyToDeleteAllOf(&deleteAllOfOptions)
 	}
-	if _, err := s.validNamespace(
-		ctx, objType, deleteAllOfOptions.Namespace); err != nil {
-		return err
+	if len(deleteAllOfOptions.Namespace) > 0 {
+		// Namespace is a filter here, so not specifying it is ok
+		if _, err := s.validNamespace(
+			ctx, objType, deleteAllOfOptions.Namespace); err != nil {
+			return err
+		}
 	}
 	typeStorage, err := s.storage(objType)
 	if err != nil {
@@ -183,7 +195,7 @@ func (s *NamespacedStorage) DeleteAllOf(ctx context.Context, obj api.Object, opt
 	return typeStorage.DeleteAllOf(ctx, obj, opts...)
 }
 
-func (s *NamespacedStorage) Update(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
+func (s *NamespacedStorage) Update(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 	if _, err := s.validNamespace(ctx, objType, obj.ObjectMeta().GetNamespace()); err != nil {
 		return err
@@ -195,7 +207,7 @@ func (s *NamespacedStorage) Update(ctx context.Context, obj api.Object, opts ...
 	return typeStorage.Update(ctx, obj, opts...)
 }
 
-func (s *NamespacedStorage) UpdateStatus(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
+func (s *NamespacedStorage) UpdateStatus(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 	if _, err := s.validNamespace(ctx, objType, obj.ObjectMeta().GetNamespace()); err != nil {
 		return err

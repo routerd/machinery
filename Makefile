@@ -31,6 +31,7 @@ VERSION?=${BRANCH}-${SHORT_SHA}
 
 PROTOC_VERSION:=v3.13.0
 PROTOCGENGO_VERSION:=v1.25.0
+PROTOCGENGOGRPC_VERSION:=v1.0.1
 
 export CGO_ENABLED:=0
 export GO111MODULE:=on
@@ -98,18 +99,35 @@ $(PROTOCGENGO):
 	@mkdir -p $(dir $(PROTOCGENGO))
 	@touch $(PROTOCGENGO)
 
+PROTOCGENGOGRPC := $(TMP_VERSIONS)/protoc-gen-go-grpc/$(PROTOCGENGOGRPC_VERSION)
+$(PROTOCGENGOGRPC):
+	$(eval PROTOCGENGOGRPC_TMP := $(shell mktemp -d))
+	@cd $(PROTOCGENGOGRPC_TMP); go get google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOCGENGOGRPC_VERSION)
+	@rm -rf $(PROTOCGENGOGRPC_TMP)
+	@rm -rf $(dir $(PROTOCGENGOGRPC))
+	@mkdir -p $(dir $(PROTOCGENGOGRPC))
+	@touch $(PROTOCGENGOGRPC)
+
 # ----------
 # Generators
 # ----------
 
-%.proto: FORCE
+%.proto: FORCE $(PROTOC) $(PROTOCGENGO) $(PROTOCGENGOGRPC)
 	$(eval PROTO_DIR := $(shell dirname $@))
 	@ echo generating $@
 	@protoc \
 		--go_out=$(PROTO_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(PROTO_DIR) --go-grpc_opt=paths=source_relative \
 		-I$(TMP)/include \
 		-Iapi/v1 \
 		-I$(PROTO_DIR) $@
+
+	$(eval PROTO_FILEBASE := $(PROTO_DIR)/$(shell basename $@ .proto))
+	@test -s $(PROTO_FILEBASE)_grpc.pb.go && \
+		cat hack/boilerplate/boilerplate.generatego.txt | sed s/YEAR/2020/ > $(PROTO_FILEBASE)_grpc.pb.go.tmp && \
+		cat $(PROTO_FILEBASE)_grpc.pb.go >> $(PROTO_FILEBASE)_grpc.pb.go.tmp && \
+		mv $(PROTO_FILEBASE)_grpc.pb.go.tmp $(PROTO_FILEBASE)_grpc.pb.go || \
+		true
 
 .PHONY: proto
 proto: api/**/*.proto testdata/**/*.proto

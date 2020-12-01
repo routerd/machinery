@@ -16,49 +16,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package api
 
 import (
-	"context"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-
-	"routerd.net/machinery/api"
 )
-
-// Storage implements all storage interfaces.
-type Storage interface {
-	Reader
-	Watcher
-	Writer
-}
-
-// Reader provides read methods for storage access.
-type Reader interface {
-	Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error
-	List(ctx context.Context, listObj api.ListObject, opts ...ListOption) error
-}
-
-type WatchClient interface {
-	Close() error
-	Events() <-chan api.ResourceEvent
-}
-
-// Watcher can be used to watch for to the specified object type.
-type Watcher interface {
-	Watch(ctx context.Context,
-		obj api.Object, opts ...ListOption) (WatchClient, error)
-}
-
-// Writer provides write methods for storage access.
-type Writer interface {
-	Create(ctx context.Context, obj api.Object, opts ...CreateOption) error
-	Delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error
-	DeleteAllOf(ctx context.Context, obj api.Object, opts ...DeleteAllOfOption) error
-	Update(ctx context.Context, obj api.Object, opts ...UpdateOption) error
-	UpdateStatus(ctx context.Context, obj api.Object, opts ...UpdateOption) error
-}
 
 type ListOptions struct {
 	Namespace     string

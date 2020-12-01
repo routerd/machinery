@@ -47,7 +47,7 @@ type InMemoryStorage struct {
 	sequence           uint64
 }
 
-var _ Storage = (*InMemoryStorage)(nil)
+var _ api.Client = (*InMemoryStorage)(nil)
 
 func NewInMemoryStorage(objType api.Object) *InMemoryStorage {
 	objName := objType.ProtoReflect().Descriptor().FullName()
@@ -62,7 +62,7 @@ func NewInMemoryStorage(objType api.Object) *InMemoryStorage {
 		},
 		data: map[string][]byte{},
 	}
-	s.hub = NewHub(func(options ListOptions) ([]api.Object, error) {
+	s.hub = NewHub(func(options api.ListOptions) ([]api.Object, error) {
 		s.mux.RLock()
 		defer s.mux.RUnlock()
 		return s.list(options)
@@ -88,12 +88,12 @@ func (s *InMemoryStorage) Get(ctx context.Context, nn api.NamespacedName, obj ap
 	return s.load(nn, obj)
 }
 
-func (s *InMemoryStorage) List(ctx context.Context, listObj api.ListObject, opts ...ListOption) error {
+func (s *InMemoryStorage) List(ctx context.Context, listObj api.ListObject, opts ...api.ListOption) error {
 	if err := s.checkListObject(listObj); err != nil {
 		return err
 	}
 
-	var options ListOptions
+	var options api.ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&options)
 	}
@@ -115,12 +115,12 @@ func (s *InMemoryStorage) List(ctx context.Context, listObj api.ListObject, opts
 	return nil
 }
 
-func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...ListOption) (WatchClient, error) {
+func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...api.ListOption) (api.WatchClient, error) {
 	if err := s.checkObject(obj); err != nil {
 		return nil, err
 	}
 
-	var options ListOptions
+	var options api.ListOptions
 	for _, opt := range opts {
 		opt.ApplyToList(&options)
 	}
@@ -129,7 +129,7 @@ func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...Lis
 		obj.ObjectMeta().GetResourceVersion(), options)
 }
 
-func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...CreateOption) error {
+func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...api.CreateOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -185,13 +185,13 @@ func (s *InMemoryStorage) Create(ctx context.Context, obj api.Object, opts ...Cr
 	return nil
 }
 
-func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...DeleteOption) error {
+func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...api.DeleteOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
 	}
 
-	var options DeleteOptions
+	var options api.DeleteOptions
 	for _, opt := range opts {
 		opt.ApplyToDelete(&options)
 	}
@@ -202,13 +202,13 @@ func (s *InMemoryStorage) Delete(ctx context.Context, obj api.Object, opts ...De
 	return s.delete(ctx, obj, options)
 }
 
-func (s *InMemoryStorage) DeleteAllOf(ctx context.Context, obj api.Object, opts ...DeleteAllOfOption) error {
+func (s *InMemoryStorage) DeleteAllOf(ctx context.Context, obj api.Object, opts ...api.DeleteAllOfOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
 	}
 
-	var options DeleteAllOfOptions
+	var options api.DeleteAllOfOptions
 	for _, opt := range opts {
 		opt.ApplyToDeleteAllOf(&options)
 	}
@@ -228,7 +228,7 @@ func (s *InMemoryStorage) DeleteAllOf(ctx context.Context, obj api.Object, opts 
 	return nil
 }
 
-func (s *InMemoryStorage) delete(ctx context.Context, obj api.Object, opts DeleteOptions) error {
+func (s *InMemoryStorage) delete(ctx context.Context, obj api.Object, opts api.DeleteOptions) error {
 	// Defaulting
 	// because we don't know what the Validation next is expecting
 	if err := Default(obj); err != nil {
@@ -258,7 +258,7 @@ func (s *InMemoryStorage) delete(ctx context.Context, obj api.Object, opts Delet
 	return nil
 }
 
-func (s *InMemoryStorage) Update(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
+func (s *InMemoryStorage) Update(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -269,7 +269,7 @@ func (s *InMemoryStorage) Update(ctx context.Context, obj api.Object, opts ...Up
 	return s.update(ctx, obj, opts...)
 }
 
-func (s *InMemoryStorage) update(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
+func (s *InMemoryStorage) update(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
 	// Load Existing
 	meta := obj.ObjectMeta()
 	existingObj := s.newObject()
@@ -291,7 +291,7 @@ func (s *InMemoryStorage) update(ctx context.Context, obj api.Object, opts ...Up
 	// Finalizer Handling
 	if obj.ObjectMeta().GetDeletedTimestamp() != nil &&
 		len(obj.ObjectMeta().GetFinalizers()) == 0 {
-		return s.delete(ctx, obj, DeleteOptions{})
+		return s.delete(ctx, obj, api.DeleteOptions{})
 	}
 
 	// Ensure Status is not updated, if the field exists
@@ -329,7 +329,7 @@ func (s *InMemoryStorage) update(ctx context.Context, obj api.Object, opts ...Up
 	return nil
 }
 
-func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts ...UpdateOption) error {
+func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
 	// Input validation
 	if err := s.checkObject(obj); err != nil {
 		return err
@@ -382,7 +382,7 @@ func (s *InMemoryStorage) UpdateStatus(ctx context.Context, obj api.Object, opts
 	return nil
 }
 
-func (s *InMemoryStorage) list(options ListOptions) ([]api.Object, error) {
+func (s *InMemoryStorage) list(options api.ListOptions) ([]api.Object, error) {
 	var out []api.Object
 	for key, entryData := range s.data {
 		if len(options.Namespace) != 0 {

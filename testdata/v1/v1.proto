@@ -46,3 +46,12 @@ service TestObjectService {
   rpc Delete(TestObject) returns (TestObject) {};
   rpc DeleteAllOf(machinery.api.v1.DeleteAllOfRequest) returns (machinery.api.v1.Status) {};
 }
+
+message Namespace {
+  machinery.api.v1.ObjectMeta meta = 1;
+}
+
+message NamespaceList {
+  // List meta = 1;
+  repeated Namespace items = 2;
+}

@@ -16,22 +16,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package client
 
-import "routerd.net/machinery/api"
+import (
+	grpc "google.golang.org/grpc"
 
-func (o *TestObject) ObjectMeta() api.ObjectMeta {
-	return o.Meta
+	"routerd.net/machinery/api"
+)
+
+type GRPCClient struct {
 }
 
-func (o *TestObjectList) ListMeta() api.ListMeta {
+type GRPCWatcher struct {
+	grpcClientStream grpc.ClientStream
+}
+
+func (w *GRPCWatcher) Events() <-chan api.ResourceEvent {
 	return nil
 }
 
-func (o *Namespace) ObjectMeta() api.ObjectMeta {
-	return o.Meta
-}
+func (w *GRPCWatcher) Close() {
 
-func (o *NamespaceList) ListMeta() api.ListMeta {
-	return nil
 }
