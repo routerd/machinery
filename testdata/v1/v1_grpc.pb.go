@@ -39,9 +39,9 @@ type TestObjectServiceClient interface {
 	Get(ctx context.Context, in *v1.GetRequest, opts ...grpc.CallOption) (*TestObject, error)
 	List(ctx context.Context, in *v1.ListRequest, opts ...grpc.CallOption) (*TestObjectList, error)
 	Watch(ctx context.Context, in *v1.WatchRequest, opts ...grpc.CallOption) (TestObjectService_WatchClient, error)
-	Create(ctx context.Context, in *TestObject, opts ...grpc.CallOption) (*TestObject, error)
-	Update(ctx context.Context, in *TestObject, opts ...grpc.CallOption) (*TestObject, error)
-	Delete(ctx context.Context, in *TestObject, opts ...grpc.CallOption) (*TestObject, error)
+	Create(ctx context.Context, in *TestObjectCreateRequest, opts ...grpc.CallOption) (*TestObject, error)
+	Update(ctx context.Context, in *TestObjectUpdateRequest, opts ...grpc.CallOption) (*TestObject, error)
+	Delete(ctx context.Context, in *TestObjectDeleteRequest, opts ...grpc.CallOption) (*TestObject, error)
 	DeleteAllOf(ctx context.Context, in *v1.DeleteAllOfRequest, opts ...grpc.CallOption) (*v1.Status, error)
 }
 
@@ -103,7 +103,7 @@ func (x *testObjectServiceWatchClient) Recv() (*v1.ResourceEvent, error) {
 	return m, nil
 }
 
-func (c *testObjectServiceClient) Create(ctx context.Context, in *TestObject, opts ...grpc.CallOption) (*TestObject, error) {
+func (c *testObjectServiceClient) Create(ctx context.Context, in *TestObjectCreateRequest, opts ...grpc.CallOption) (*TestObject, error) {
 	out := new(TestObject)
 	err := c.cc.Invoke(ctx, "/machinery.testdata.v1.TestObjectService/Create", in, out, opts...)
 	if err != nil {
@@ -112,7 +112,7 @@ func (c *testObjectServiceClient) Create(ctx context.Context, in *TestObject, op
 	return out, nil
 }
 
-func (c *testObjectServiceClient) Update(ctx context.Context, in *TestObject, opts ...grpc.CallOption) (*TestObject, error) {
+func (c *testObjectServiceClient) Update(ctx context.Context, in *TestObjectUpdateRequest, opts ...grpc.CallOption) (*TestObject, error) {
 	out := new(TestObject)
 	err := c.cc.Invoke(ctx, "/machinery.testdata.v1.TestObjectService/Update", in, out, opts...)
 	if err != nil {
@@ -121,7 +121,7 @@ func (c *testObjectServiceClient) Update(ctx context.Context, in *TestObject, op
 	return out, nil
 }
 
-func (c *testObjectServiceClient) Delete(ctx context.Context, in *TestObject, opts ...grpc.CallOption) (*TestObject, error) {
+func (c *testObjectServiceClient) Delete(ctx context.Context, in *TestObjectDeleteRequest, opts ...grpc.CallOption) (*TestObject, error) {
 	out := new(TestObject)
 	err := c.cc.Invoke(ctx, "/machinery.testdata.v1.TestObjectService/Delete", in, out, opts...)
 	if err != nil {
@@ -146,9 +146,9 @@ type TestObjectServiceServer interface {
 	Get(context.Context, *v1.GetRequest) (*TestObject, error)
 	List(context.Context, *v1.ListRequest) (*TestObjectList, error)
 	Watch(*v1.WatchRequest, TestObjectService_WatchServer) error
-	Create(context.Context, *TestObject) (*TestObject, error)
-	Update(context.Context, *TestObject) (*TestObject, error)
-	Delete(context.Context, *TestObject) (*TestObject, error)
+	Create(context.Context, *TestObjectCreateRequest) (*TestObject, error)
+	Update(context.Context, *TestObjectUpdateRequest) (*TestObject, error)
+	Delete(context.Context, *TestObjectDeleteRequest) (*TestObject, error)
 	DeleteAllOf(context.Context, *v1.DeleteAllOfRequest) (*v1.Status, error)
 	mustEmbedUnimplementedTestObjectServiceServer()
 }
@@ -166,13 +166,13 @@ func (UnimplementedTestObjectServiceServer) List(context.Context, *v1.ListReques
 func (UnimplementedTestObjectServiceServer) Watch(*v1.WatchRequest, TestObjectService_WatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
 }
-func (UnimplementedTestObjectServiceServer) Create(context.Context, *TestObject) (*TestObject, error) {
+func (UnimplementedTestObjectServiceServer) Create(context.Context, *TestObjectCreateRequest) (*TestObject, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
 }
-func (UnimplementedTestObjectServiceServer) Update(context.Context, *TestObject) (*TestObject, error) {
+func (UnimplementedTestObjectServiceServer) Update(context.Context, *TestObjectUpdateRequest) (*TestObject, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
-func (UnimplementedTestObjectServiceServer) Delete(context.Context, *TestObject) (*TestObject, error) {
+func (UnimplementedTestObjectServiceServer) Delete(context.Context, *TestObjectDeleteRequest) (*TestObject, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedTestObjectServiceServer) DeleteAllOf(context.Context, *v1.DeleteAllOfRequest) (*v1.Status, error) {
@@ -249,7 +249,7 @@ func (x *testObjectServiceWatchServer) Send(m *v1.ResourceEvent) error {
 }
 
 func _TestObjectService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TestObject)
+	in := new(TestObjectCreateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -261,13 +261,13 @@ func _TestObjectService_Create_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: "/machinery.testdata.v1.TestObjectService/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TestObjectServiceServer).Create(ctx, req.(*TestObject))
+		return srv.(TestObjectServiceServer).Create(ctx, req.(*TestObjectCreateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _TestObjectService_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TestObject)
+	in := new(TestObjectUpdateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -279,13 +279,13 @@ func _TestObjectService_Update_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: "/machinery.testdata.v1.TestObjectService/Update",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TestObjectServiceServer).Update(ctx, req.(*TestObject))
+		return srv.(TestObjectServiceServer).Update(ctx, req.(*TestObjectUpdateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _TestObjectService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TestObject)
+	in := new(TestObjectDeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func _TestObjectService_Delete_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: "/machinery.testdata.v1.TestObjectService/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TestObjectServiceServer).Delete(ctx, req.(*TestObject))
+		return srv.(TestObjectServiceServer).Delete(ctx, req.(*TestObjectDeleteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

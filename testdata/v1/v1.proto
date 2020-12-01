@@ -37,13 +37,28 @@ message TestObjectList {
   repeated TestObject items = 1;
 }
 
+message TestObjectDeleteRequest {
+  TestObject object = 1;
+  machinery.api.v1.DeleteRequestOptions options = 2;
+}
+
+message TestObjectCreateRequest {
+  TestObject object = 1;
+  machinery.api.v1.CreateRequestOptions options = 2;
+}
+
+message TestObjectUpdateRequest {
+  TestObject object = 1;
+  machinery.api.v1.UpdateRequestOptions options = 2;
+}
+
 service TestObjectService {
   rpc Get(machinery.api.v1.GetRequest) returns (TestObject) {};
   rpc List(machinery.api.v1.ListRequest) returns (TestObjectList) {};
   rpc Watch(machinery.api.v1.WatchRequest) returns (stream machinery.api.v1.ResourceEvent) {};
-  rpc Create(TestObject) returns (TestObject) {};
-  rpc Update(TestObject) returns (TestObject) {};
-  rpc Delete(TestObject) returns (TestObject) {};
+  rpc Create(TestObjectCreateRequest) returns (TestObject) {};
+  rpc Update(TestObjectUpdateRequest) returns (TestObject) {};
+  rpc Delete(TestObjectDeleteRequest) returns (TestObject) {};
   rpc DeleteAllOf(machinery.api.v1.DeleteAllOfRequest) returns (machinery.api.v1.Status) {};
 }
 

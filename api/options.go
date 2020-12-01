@@ -93,6 +93,10 @@ func (m MatchLabels) ApplyToWatch(opts *WatchOptions) {
 	m.ApplyToList(&opts.ListOptions)
 }
 
+func (m MatchLabels) ApplyToDeleteAllOf(opts *DeleteAllOfOptions) {
+	m.ApplyToList(&opts.ListOptions)
+}
+
 type HasLabels []string
 
 func (m HasLabels) ApplyToList(opts *ListOptions) {
@@ -104,6 +108,10 @@ func (m HasLabels) ApplyToList(opts *ListOptions) {
 		}
 	}
 	opts.LabelSelector = sel
+}
+
+func (m HasLabels) ApplyToDeleteAllOf(opts *DeleteAllOfOptions) {
+	m.ApplyToList(&opts.ListOptions)
 }
 
 func (m HasLabels) ApplyToWatch(opts *WatchOptions) {

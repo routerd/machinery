@@ -19,22 +19,287 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package client
 
 import (
+	"context"
+	"io"
+	"reflect"
+
 	grpc "google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"routerd.net/machinery/api"
+	machineryv1 "routerd.net/machinery/api/v1"
 )
 
+var _ api.Client = (*GRPCClient)(nil)
+
 type GRPCClient struct {
+	get          func(ctx context.Context, nn api.NamespacedName, obj api.Object) error
+	list         func(ctx context.Context, listObj api.ListObject, opts api.ListOptions) error
+	delete       func(ctx context.Context, obj api.Object, opts api.DeleteOptions) error
+	deleteAllOf  func(ctx context.Context, opts api.DeleteAllOfOptions) error
+	create       func(ctx context.Context, obj api.Object, opts api.CreateOptions) error
+	update       func(ctx context.Context, obj api.Object, opts api.UpdateOptions) error
+	updateStatus func(ctx context.Context, obj api.Object, opts api.UpdateOptions) error
+	watch        func(ctx context.Context, opts api.WatchOptions) (grpc.ClientStream, error)
 }
 
-type GRPCWatcher struct {
-	grpcClientStream grpc.ClientStream
+func NewGRPCClient(client interface{}) (*GRPCClient, error) {
+	c := &GRPCClient{}
+	rv := reflect.ValueOf(client)
+
+	if getter := rv.MethodByName("Get"); getter.IsValid() {
+		// TODO: check signature
+		c.get = func(ctx context.Context, nn api.NamespacedName, obj api.Object) error {
+
+			rargs := getter.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(&machineryv1.GetRequest{
+					Name:      nn.Name,
+					Namespace: nn.Namespace,
+				}),
+			})
+			if !rargs[0].IsNil() {
+				// write into given object
+				proto.Merge(obj, rargs[0].Interface().(api.Object))
+			}
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
+	if lister := rv.MethodByName("List"); lister.IsValid() {
+		// TODO: check signature
+		c.list = func(ctx context.Context, listObj api.ListObject, opts api.ListOptions) error {
+
+			req := &machineryv1.ListRequest{
+				Namespace: opts.Namespace,
+			}
+			if opts.LabelSelector != nil {
+				req.LabelSelector = opts.LabelSelector.String()
+			}
+
+			rargs := lister.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(req),
+			})
+			if !rargs[0].IsNil() {
+				// write into given object
+				proto.Merge(listObj, rargs[0].Interface().(api.ListObject))
+			}
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
+	if delete := rv.MethodByName("Delete"); delete.IsValid() {
+		deleteType := delete.Type()
+		// TODO: check signature
+		c.delete = func(ctx context.Context, obj api.Object, opts api.DeleteOptions) error {
+			req := reflect.New(deleteType.In(1).Elem())
+
+			req.Elem().FieldByName("Object").
+				Set(reflect.ValueOf(obj))
+
+			rargs := delete.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				req,
+			})
+			if !rargs[0].IsNil() {
+				// write into given object
+				proto.Merge(obj, rargs[0].Interface().(api.Object))
+			}
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
+	if delete := rv.MethodByName("DeleteAllOf"); delete.IsValid() {
+		// TODO: check signature
+		c.deleteAllOf = func(ctx context.Context, opts api.DeleteAllOfOptions) error {
+
+			req := &machineryv1.DeleteAllOfRequest{
+				Namespace: opts.Namespace,
+			}
+			if opts.LabelSelector != nil {
+				req.LabelSelector = opts.LabelSelector.String()
+			}
+
+			rargs := delete.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(req),
+			})
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
+	if update := rv.MethodByName("Update"); update.IsValid() {
+		updateType := update.Type()
+		// TODO: check signature
+		c.update = func(ctx context.Context, obj api.Object, opts api.UpdateOptions) error {
+			req := reflect.New(updateType.In(1).Elem())
+
+			req.Elem().FieldByName("Object").
+				Set(reflect.ValueOf(obj))
+
+			rargs := update.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				req,
+			})
+			if !rargs[0].IsNil() {
+				// write into given object
+				proto.Merge(obj, rargs[0].Interface().(api.Object))
+			}
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
+	if update := rv.MethodByName("UpdateStatus"); update.IsValid() {
+		updateType := update.Type()
+		// TODO: check signature
+		c.updateStatus = func(ctx context.Context, obj api.Object, opts api.UpdateOptions) error {
+			req := reflect.New(updateType.In(1).Elem())
+
+			req.Elem().FieldByName("Object").
+				Set(reflect.ValueOf(obj))
+
+			rargs := update.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				req,
+			})
+			if !rargs[0].IsNil() {
+				// write into given object
+				proto.Merge(obj, rargs[0].Interface().(api.Object))
+			}
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
+	if watch := rv.MethodByName("Watch"); watch.IsValid() {
+		// TODO: check signature
+		c.watch = func(ctx context.Context, opts api.WatchOptions) (grpc.ClientStream, error) {
+
+			req := &machineryv1.WatchRequest{
+				Namespace: opts.Namespace,
+			}
+			if opts.LabelSelector != nil {
+				req.LabelSelector = opts.LabelSelector.String()
+			}
+
+			rargs := watch.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(req),
+			})
+
+			stream, _ := rargs[0].Interface().(grpc.ClientStream)
+			err, _ := rargs[1].Interface().(error)
+			return stream, err
+		}
+	}
+
+	return c, nil
 }
 
-func (w *GRPCWatcher) Events() <-chan api.ResourceEvent {
-	return nil
+func (c *GRPCClient) Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error {
+	return c.get(ctx, nn, obj)
 }
 
-func (w *GRPCWatcher) Close() {
+func (c *GRPCClient) List(ctx context.Context, listObj api.ListObject, opts ...api.ListOption) error {
+	var listOpts api.ListOptions
+	for _, opt := range opts {
+		opt.ApplyToList(&listOpts)
+	}
+	return c.list(ctx, listObj, listOpts)
+}
 
+func (c *GRPCClient) Create(ctx context.Context, obj api.Object, opts ...api.CreateOption) error {
+	var createOpts api.CreateOptions
+	for _, opt := range opts {
+		opt.ApplyToCreate(&createOpts)
+	}
+	return c.create(ctx, obj, createOpts)
+}
+
+func (c *GRPCClient) Delete(ctx context.Context, obj api.Object, opts ...api.DeleteOption) error {
+	var deleteOpts api.DeleteOptions
+	for _, opt := range opts {
+		opt.ApplyToDelete(&deleteOpts)
+	}
+	return c.delete(ctx, obj, deleteOpts)
+}
+
+func (c *GRPCClient) DeleteAllOf(ctx context.Context, obj api.Object, opts ...api.DeleteAllOfOption) error {
+	var deleteOpts api.DeleteAllOfOptions
+	for _, opt := range opts {
+		opt.ApplyToDeleteAllOf(&deleteOpts)
+	}
+	return c.deleteAllOf(ctx, deleteOpts)
+}
+
+func (c *GRPCClient) Update(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
+	var updateOpts api.UpdateOptions
+	for _, opt := range opts {
+		opt.ApplyToUpdate(&updateOpts)
+	}
+	return c.update(ctx, obj, updateOpts)
+}
+
+func (c *GRPCClient) UpdateStatus(ctx context.Context, obj api.Object, opts ...api.UpdateOption) error {
+	var updateOpts api.UpdateOptions
+	for _, opt := range opts {
+		opt.ApplyToUpdate(&updateOpts)
+	}
+	return c.updateStatus(ctx, obj, updateOpts)
+}
+
+func (c *GRPCClient) Watch(ctx context.Context,
+	obj api.Object, opts ...api.ListOption) (api.WatchClient, error) {
+	return nil, nil
+}
+
+type grpcWatcher struct {
+	stream grpc.ClientStream
+	cancel func()
+}
+
+func (w *grpcWatcher) Events() <-chan api.ResourceEvent {
+	events := make(chan api.ResourceEvent)
+	go func(events chan api.ResourceEvent) {
+		defer close(events)
+		for {
+			event := &machineryv1.ResourceEvent{}
+			err := w.stream.RecvMsg(event)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				events <- api.ResourceEvent{
+					Type: api.Error,
+				}
+				break
+			}
+
+			obj, err := anypb.UnmarshalNew(
+				event.Object, proto.UnmarshalOptions{})
+			if err != nil {
+				events <- api.ResourceEvent{
+					Type: api.Error,
+				}
+				break
+			}
+
+			events <- api.ResourceEvent{
+				Type:   api.ResourceEventType(event.Type),
+				Object: obj.(api.Object),
+			}
+		}
+	}(events)
+	return events
+}
+
+func (w *grpcWatcher) Close() {
+	w.cancel()
 }

@@ -19,12 +19,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package client
 
 import (
+	"context"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	"routerd.net/machinery/api"
+	"routerd.net/machinery/errors"
 )
 
 type Cache struct {
 	objects map[string]api.Object
 	mux     sync.RWMutex
+}
+
+func (c *Cache) Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+
+	cachedObj, ok := c.objects[nn.String()]
+	if !ok {
+		return errors.ErrNotFound{
+			NamespacedName: nn,
+			TypeFullName:   string(obj.ProtoReflect().Descriptor().FullName()),
+		}
+	}
+
+	proto.Merge(obj, cachedObj)
+	return nil
+}
+
+func (c *Cache) List(ctx context.Context, listObj api.ListObject, opts ...api.ListOption) error {
+
+	var options api.ListOptions
+	for _, opt := range opts {
+		opt.ApplyToList(&options)
+	}
+
+	return nil
 }

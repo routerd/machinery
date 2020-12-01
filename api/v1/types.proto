@@ -104,6 +104,7 @@ message Status {
 
 message GetRequest {
   string name = 1;
+  string namespace = 2;
 }
 
 message ListRequest {
@@ -119,6 +120,30 @@ message WatchRequest {
 message DeleteAllOfRequest {
   string namespace = 1;
   string labelSelector = 2;
+}
+
+message DeleteRequestOptions {}
+message UpdateRequestOptions {}
+message CreateRequestOptions {}
+
+message DeleteRequest {
+  google.protobuf.Any object = 1;
+  // extra options
+}
+
+message UpdateRequest {
+  google.protobuf.Any object = 1;
+  // extra options
+}
+
+message UpdateStatusRequest {
+  google.protobuf.Any object = 1;
+  // extra options
+}
+
+message CreateRequest {
+  google.protobuf.Any object = 1;
+  // extra options
 }
 
 // service NamespaceService {
