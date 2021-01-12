@@ -323,6 +323,7 @@ func (w *grpcWatcher) Events() <-chan api.ResourceEvent {
 			if err != nil {
 				events <- api.ResourceEvent{
 					Type: api.Error,
+					// TODO: add error details
 				}
 				return
 			}

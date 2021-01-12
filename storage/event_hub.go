@@ -73,7 +73,7 @@ func (h *eventHub) Broadcast(eventType api.ResourceEventType, obj api.Object) {
 }
 
 func (h *eventHub) Register(
-	resourceVersion string, opts api.ListOptions,
+	resourceVersion string, opts api.WatchOptions,
 ) (EventClient, error) {
 	c := newEventClient(50, resourceVersion, opts, h.deregister)
 	h.register <- c
@@ -146,7 +146,7 @@ func (h *eventHub) seed(c EventClient) {
 
 	// client is not requesting a specific revision,
 	// so we seed the client by sending all known objects.
-	objects, err := h.list(c.options())
+	objects, err := h.list(c.options().ListOptions)
 	if err != nil {
 		c.error(err)
 		h.closeEventClient(c)

@@ -115,14 +115,14 @@ func (s *InMemoryStorage) List(ctx context.Context, listObj api.ListObject, opts
 	return nil
 }
 
-func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...api.ListOption) (api.WatchClient, error) {
+func (s *InMemoryStorage) Watch(ctx context.Context, obj api.Object, opts ...api.WatchOption) (api.WatchClient, error) {
 	if err := s.checkObject(obj); err != nil {
 		return nil, err
 	}
 
-	var options api.ListOptions
+	var options api.WatchOptions
 	for _, opt := range opts {
-		opt.ApplyToList(&options)
+		opt.ApplyToWatch(&options)
 	}
 
 	return s.hub.Register(

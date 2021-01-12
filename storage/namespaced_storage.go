@@ -127,17 +127,17 @@ func (s *NamespacedStorage) List(ctx context.Context, listObj api.ListObject, op
 	return typeStorage.List(ctx, listObj, opts...)
 }
 
-func (s *NamespacedStorage) Watch(ctx context.Context, obj api.Object, opts ...api.ListOption) (api.WatchClient, error) {
+func (s *NamespacedStorage) Watch(ctx context.Context, obj api.Object, opts ...api.WatchOption) (api.WatchClient, error) {
 	objType := obj.ProtoReflect().Descriptor().FullName()
 
-	var listOptions api.ListOptions
+	var watchOptions api.WatchOptions
 	for _, opt := range opts {
-		opt.ApplyToList(&listOptions)
+		opt.ApplyToWatch(&watchOptions)
 	}
-	if len(listOptions.Namespace) > 0 {
+	if len(watchOptions.Namespace) > 0 {
 		// Namespace is a filter here, so not specifying it is ok
 		if _, err := s.validNamespace(
-			ctx, objType, listOptions.Namespace); err != nil {
+			ctx, objType, watchOptions.Namespace); err != nil {
 			return nil, err
 		}
 	}
