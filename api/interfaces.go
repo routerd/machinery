@@ -49,5 +49,5 @@ type WatchClient interface {
 // Watcher can be used to watch for to the specified object type.
 type Watcher interface {
 	Watch(ctx context.Context,
-		obj Object, opts ...ListOption) (WatchClient, error)
+		obj Object, opts ...WatchOption) (WatchClient, error)
 }

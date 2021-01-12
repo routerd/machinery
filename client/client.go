@@ -114,6 +114,28 @@ func NewGRPCClient(client interface{}) (*GRPCClient, error) {
 		}
 	}
 
+	if create := rv.MethodByName("Create"); create.IsValid() {
+		createType := create.Type()
+		// TODO: check signature
+		c.create = func(ctx context.Context, obj api.Object, opts api.CreateOptions) error {
+			req := reflect.New(createType.In(1).Elem())
+
+			req.Elem().FieldByName("Object").
+				Set(reflect.ValueOf(obj))
+
+			rargs := create.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				req,
+			})
+			if !rargs[0].IsNil() {
+				// write into given object
+				proto.Merge(obj, rargs[0].Interface().(api.Object))
+			}
+			err, _ := rargs[1].Interface().(error)
+			return err
+		}
+	}
+
 	if delete := rv.MethodByName("DeleteAllOf"); delete.IsValid() {
 		// TODO: check signature
 		c.deleteAllOf = func(ctx context.Context, opts api.DeleteAllOfOptions) error {
@@ -256,8 +278,21 @@ func (c *GRPCClient) UpdateStatus(ctx context.Context, obj api.Object, opts ...a
 }
 
 func (c *GRPCClient) Watch(ctx context.Context,
-	obj api.Object, opts ...api.ListOption) (api.WatchClient, error) {
-	return nil, nil
+	obj api.Object, opts ...api.WatchOption) (api.WatchClient, error) {
+	var watchOpts api.WatchOptions
+	for _, opt := range opts {
+		opt.ApplyToWatch(&watchOpts)
+	}
+
+	w := &grpcWatcher{}
+	ctx, w.cancel = context.WithCancel(ctx)
+
+	var err error
+	w.stream, err = c.watch(ctx, watchOpts)
+	if err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 type grpcWatcher struct {
@@ -266,20 +301,21 @@ type grpcWatcher struct {
 }
 
 func (w *grpcWatcher) Events() <-chan api.ResourceEvent {
-	events := make(chan api.ResourceEvent)
+	e := make(chan api.ResourceEvent, 10)
 	go func(events chan api.ResourceEvent) {
 		defer close(events)
 		for {
 			event := &machineryv1.ResourceEvent{}
 			err := w.stream.RecvMsg(event)
 			if err == io.EOF {
-				break
+				return
 			}
 			if err != nil {
 				events <- api.ResourceEvent{
 					Type: api.Error,
+					// TODO: add error details
 				}
-				break
+				return
 			}
 
 			obj, err := anypb.UnmarshalNew(
@@ -288,7 +324,7 @@ func (w *grpcWatcher) Events() <-chan api.ResourceEvent {
 				events <- api.ResourceEvent{
 					Type: api.Error,
 				}
-				break
+				return
 			}
 
 			events <- api.ResourceEvent{
@@ -296,10 +332,11 @@ func (w *grpcWatcher) Events() <-chan api.ResourceEvent {
 				Object: obj.(api.Object),
 			}
 		}
-	}(events)
-	return events
+	}(e)
+	return e
 }
 
-func (w *grpcWatcher) Close() {
+func (w *grpcWatcher) Close() error {
 	w.cancel()
+	return nil
 }

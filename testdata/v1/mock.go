@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	v1 "routerd.net/machinery/api/v1"
 )
@@ -83,4 +84,48 @@ func (m *TestObjectServiceClientMock) DeleteAllOf(ctx context.Context, in *v1.De
 	args := m.Called(ctx, in, opts)
 	err, _ := args.Get(1).(error)
 	return args.Get(0).(*v1.Status), err
+}
+
+type TestObjectService_WatchClientMock struct {
+	mock.Mock
+}
+
+func (m *TestObjectService_WatchClientMock) Recv() (*v1.ResourceEvent, error) {
+	args := m.Called()
+	err, _ := args.Get(1).(error)
+	return args.Get(0).(*v1.ResourceEvent), err
+}
+
+func (m *TestObjectService_WatchClientMock) Header() (metadata.MD, error) {
+	args := m.Called()
+	err, _ := args.Get(1).(error)
+	return args.Get(0).(metadata.MD), err
+}
+
+func (m *TestObjectService_WatchClientMock) Trailer() metadata.MD {
+	args := m.Called()
+	return args.Get(0).(metadata.MD)
+}
+
+func (m *TestObjectService_WatchClientMock) CloseSend() error {
+	args := m.Called()
+	err, _ := args.Get(0).(error)
+	return err
+}
+
+func (m *TestObjectService_WatchClientMock) Context() context.Context {
+	args := m.Called()
+	return args.Get(0).(context.Context)
+}
+
+func (m *TestObjectService_WatchClientMock) SendMsg(msg interface{}) error {
+	args := m.Called(msg)
+	err, _ := args.Get(0).(error)
+	return err
+}
+
+func (m *TestObjectService_WatchClientMock) RecvMsg(msg interface{}) error {
+	args := m.Called(msg)
+	err, _ := args.Get(0).(error)
+	return err
 }

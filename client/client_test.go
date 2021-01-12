@@ -20,12 +20,14 @@ package client
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"routerd.net/machinery/api"
 	machineryv1 "routerd.net/machinery/api/v1"
@@ -102,6 +104,29 @@ func TestGRPCClient(t *testing.T) {
 		m.AssertCalled(t, "List", ctx, &machineryv1.ListRequest{
 			Namespace:     "test",
 			LabelSelector: "test=test",
+		}, mock.Anything)
+	})
+
+	t.Run("Create", func(t *testing.T) {
+		// Init
+		m := &testdatav1.TestObjectServiceClientMock{}
+		c, err := NewGRPCClient(m)
+		require.NoError(t, err)
+
+		// Mock Setup
+		m.
+			On("Create", mock.Anything, mock.Anything, mock.Anything).
+			Return(apiObject, nil)
+
+		// Test
+		ctx := context.Background()
+		obj := &testdatav1.TestObject{}
+		err = c.Create(ctx, obj)
+		require.NoError(t, err)
+
+		assert.True(t, proto.Equal(apiObject, obj), "obj and apiObject should be equal")
+		m.AssertCalled(t, "Create", ctx, &testdatav1.TestObjectCreateRequest{
+			Object: obj,
 		}, mock.Anything)
 	})
 
@@ -195,5 +220,57 @@ func TestGRPCClient(t *testing.T) {
 			Namespace:     "test",
 			LabelSelector: "test=test",
 		}, mock.Anything)
+	})
+
+	resourceEventAny, err := anypb.New(apiObject)
+	require.NoError(t, err)
+	machineryResourceEvent := &machineryv1.ResourceEvent{
+		Type:   string(api.Modified),
+		Object: resourceEventAny,
+	}
+
+	t.Run("Watch", func(t *testing.T) {
+		// Init
+		m := &testdatav1.TestObjectServiceClientMock{}
+		streamM := &testdatav1.TestObjectService_WatchClientMock{}
+
+		c, err := NewGRPCClient(m)
+		require.NoError(t, err)
+
+		// Mock Setup
+		m.
+			On("Watch", mock.Anything, mock.Anything, mock.Anything).
+			Return(streamM, nil).Once()
+		streamM.
+			On("RecvMsg", mock.Anything).
+			Run(func(args mock.Arguments) {
+				obj := args.Get(0).(*machineryv1.ResourceEvent)
+				proto.Merge(obj, machineryResourceEvent)
+			}).
+			Return(nil).
+			Times(3)
+		streamM.On("RecvMsg", mock.Anything).
+			Return(io.EOF).
+			Once()
+
+		// Test
+		ctx := context.Background()
+		stream, err := c.Watch(ctx, &testdatav1.TestObject{},
+			api.InNamespace("test"), api.MatchLabels{"test": "test"})
+		require.NoError(t, err)
+		require.NotNil(t, stream)
+
+		m.AssertCalled(t, "Watch", mock.Anything, &machineryv1.WatchRequest{
+			Namespace:     "test",
+			LabelSelector: "test=test",
+		}, mock.Anything)
+
+		var eventCounter int
+		for e := range stream.Events() {
+			assert.Equal(t, api.Modified, e.Type)
+			assert.True(t, proto.Equal(apiObject, e.Object))
+			eventCounter++
+		}
+		assert.Equal(t, 3, eventCounter)
 	})
 }
