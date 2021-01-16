@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package admission
 
 import (
+	"context"
 	"fmt"
 
 	protoV1 "github.com/golang/protobuf/proto"
@@ -64,12 +65,18 @@ func (v *GenericValidation) validateMetadata(obj api.Object) (
 		}
 	}
 
-	if v.Scheme.IsNamespaced(obj) &&
-		len(meta.GetNamespace()) == 0 {
-		violations = append(violations, &v1.BadRequest_FieldViolation{
-			Field:       ".meta.namespace",
-			Description: api.NotEmptyDescription,
-		})
+	if v.Scheme.IsNamespaced(obj) {
+		if len(meta.GetNamespace()) == 0 {
+			violations = append(violations, &v1.BadRequest_FieldViolation{
+				Field:       ".meta.namespace",
+				Description: api.NotEmptyDescription,
+			})
+		} else if err := validate.ValidateNamespace(meta.GetNamespace()); err != nil {
+			violations = append(violations, &v1.BadRequest_FieldViolation{
+				Field:       ".meta.namespace",
+				Description: err.Error(),
+			})
+		}
 	}
 
 	var i int
@@ -102,14 +109,25 @@ func (v *GenericValidation) validateMetadata(obj api.Object) (
 		if len(v) > 1024 {
 			violations = append(violations, &v1.BadRequest_FieldViolation{
 				Field:       fmt.Sprintf(".meta.annoations[%d]", i),
-				Description: "invalid value: Must be 1024 characters or less.",
+				Description: "invalid value: Must be 1024 characters or less",
 			})
 		}
 		i++
 	}
 
+	finalizers := map[string]struct{}{}
 	i = 0
 	for _, finalizer := range meta.GetFinalizers() {
+		if _, ok := finalizers[finalizer]; ok {
+			// no duplicated finalizers
+			violations = append(violations, &v1.BadRequest_FieldViolation{
+				Field:       fmt.Sprintf(".meta.finalizers[%d]", i),
+				Description: "finalizers can not contain the same key more than once",
+			})
+		} else {
+			finalizers[finalizer] = struct{}{}
+		}
+
 		if err := validate.ValidateQualifiedKey(finalizer); err != nil {
 			violations = append(violations, &v1.BadRequest_FieldViolation{
 				Field:       fmt.Sprintf(".meta.finalizers[%d]", i),
@@ -131,9 +149,154 @@ func (v *GenericValidation) validateMetadata(obj api.Object) (
 	return violations
 }
 
-func (v *GenericValidation) OnCreate(obj api.Object) error {
+type validateCreate interface {
+	ValidateCreate(ctx context.Context) error
+}
+
+func (v *GenericValidation) OnCreate(ctx context.Context, obj api.Object) error {
 	violations := v.validateMetadata(obj)
 
+	if vobj, ok := obj.(validateCreate); ok {
+		err := vobj.ValidateCreate(ctx)
+		s, ok := status.FromError(err)
+		if ok && s.Code() == codes.InvalidArgument {
+			// add the details from the status
+			violations = append(violations, asProtoMessages(s.Details())...)
+		} else if err != nil {
+			// unknown error/other status code
+			return err
+		}
+	}
+	return checkViolations(violations)
+}
+
+type validateUpdate interface {
+	ValidateUpdate(ctx context.Context, old api.Object) error
+}
+
+func (v *GenericValidation) OnUpdate(ctx context.Context, obj api.Object) error {
+	violations := v.validateMetadata(obj)
+
+	old := proto.Clone(obj).(api.Object)
+	err := v.Getter.Get(ctx, api.NamespacedName{
+		Name:      obj.ObjectMeta().GetName(),
+		Namespace: obj.ObjectMeta().GetNamespace(),
+	}, old)
+	if err != nil {
+		return err
+	}
+
+	// Finalizer Handling
+	if obj.ObjectMeta().GetDeletedTimestamp() != nil ||
+		old.ObjectMeta().GetDeletedTimestamp() != nil {
+		if old.ObjectMeta().GetDeletedTimestamp() != nil &&
+			!obj.ObjectMeta().GetDeletedTimestamp().AsTime().Equal(
+				old.ObjectMeta().GetDeletedTimestamp().AsTime()) {
+			violations = append(violations, &v1.BadRequest_FieldViolation{
+				Field:       ".meta.deletedTimestamp",
+				Description: "immutable after being set",
+			})
+		}
+
+		// don't allow adding new finalizers
+		oldFinalizers := map[string]struct{}{}
+		for _, finalizer := range old.ObjectMeta().GetFinalizers() {
+			oldFinalizers[finalizer] = struct{}{}
+		}
+		for i, finalizer := range obj.ObjectMeta().GetFinalizers() {
+			if _, ok := oldFinalizers[finalizer]; !ok {
+				violations = append(violations, &v1.BadRequest_FieldViolation{
+					Field:       fmt.Sprintf(".meta.finalizers[%d]", i),
+					Description: "can't add new finalizers after object deletion",
+				})
+			}
+		}
+
+		// only allow updates to finalizers
+		oldWithNewFinalizers := proto.Clone(old).(api.Object)
+		oldWithNewFinalizers.ObjectMeta().SetFinalizers(
+			obj.ObjectMeta().GetFinalizers())
+		oldWithNewFinalizers.ObjectMeta().SetDeletedTimestamp(
+			obj.ObjectMeta().GetDeletedTimestamp())
+
+		if !proto.Equal(obj, oldWithNewFinalizers) {
+			violations = append(violations, &v1.BadRequest_FieldViolation{
+				Field:       ".meta.finalizers",
+				Description: "object deleted, only finalizers can be updated",
+			})
+		}
+	}
+
+	// immutable metadata fields
+	if obj.ObjectMeta().GetGenerateName() !=
+		old.ObjectMeta().GetGenerateName() {
+		violations = append(violations, &v1.BadRequest_FieldViolation{
+			Field:       ".meta.generateName",
+			Description: api.Immutable,
+		})
+	}
+	if obj.ObjectMeta().GetUid() !=
+		old.ObjectMeta().GetUid() {
+		violations = append(violations, &v1.BadRequest_FieldViolation{
+			Field:       ".meta.uid",
+			Description: api.Immutable,
+		})
+	}
+	if !obj.ObjectMeta().GetCreatedTimestamp().AsTime().Equal(
+		old.ObjectMeta().GetCreatedTimestamp().AsTime()) {
+		violations = append(violations, &v1.BadRequest_FieldViolation{
+			Field:       ".meta.createdTimestamp",
+			Description: api.Immutable,
+		})
+	}
+
+	if vobj, ok := obj.(validateUpdate); ok {
+		err := vobj.ValidateUpdate(ctx, old)
+		s, ok := status.FromError(err)
+		if ok && s.Code() == codes.InvalidArgument {
+			// add the details from the status
+			violations = append(violations, asProtoMessages(s.Details())...)
+		} else if err != nil {
+			// unknown error/other status code
+			return err
+		}
+	}
+	return checkViolations(violations)
+}
+
+type validateDelete interface {
+	ValidateDelete(ctx context.Context) error
+}
+
+func (v *GenericValidation) OnDelete(ctx context.Context, obj api.Object) error {
+	violations := v.validateMetadata(obj)
+
+	if vobj, ok := obj.(validateDelete); ok {
+		err := vobj.ValidateDelete(ctx)
+		s, ok := status.FromError(err)
+		if ok && s.Code() == codes.InvalidArgument {
+			// add the details from the status
+			violations = append(violations, asProtoMessages(s.Details())...)
+		} else if err != nil {
+			// unknown error/other status code
+			return err
+		}
+	}
+	return checkViolations(violations)
+}
+
+func asProtoMessages(list []interface{}) []proto.Message {
+	var messages []proto.Message
+	for _, i := range list {
+		msg, ok := i.(proto.Message)
+		if ok {
+			messages = append(messages, msg)
+		}
+	}
+	return messages
+}
+
+func checkViolations(violations []proto.Message) error {
 	if len(violations) > 0 {
 		violationsV1 := make([]protoV1.Message, len(violations))
 		for i, v := range violations {
@@ -148,14 +311,5 @@ func (v *GenericValidation) OnCreate(obj api.Object) error {
 		}
 		return s.Err()
 	}
-
-	return nil
-}
-
-func (v *GenericValidation) OnUpdate(obj api.Object) error {
-	return nil
-}
-
-func (v *GenericValidation) OnDelete(obj api.Object) error {
 	return nil
 }

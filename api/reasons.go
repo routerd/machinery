@@ -20,5 +20,6 @@ package api
 
 // Common status descriptions.
 const (
-	NotEmptyDescription = "May not be empty."
+	NotEmptyDescription = "may not be empty"
+	Immutable           = "is immutable"
 )

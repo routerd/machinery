@@ -19,68 +19,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package admission
 
 import (
+	"context"
+
 	"routerd.net/machinery/api"
 )
 
 // AdmissionController checks objects from requests before they are commited to storage.
 type AdmissionController interface {
-	OnCreate(obj api.Object) error
-	OnUpdate(obj api.Object) error
-	OnDelete(obj api.Object) error
+	OnCreate(ctx context.Context, obj api.Object) error
+	OnUpdate(ctx context.Context, obj api.Object) error
+	OnDelete(ctx context.Context, obj api.Object) error
 }
 
 // AdmissionControllerFns wraps closures to match the AdmissionController interface.
 type AdmissionControllerFns struct {
-	OnCreateFn func(obj api.Object) error
-	OnUpdateFn func(obj api.Object) error
-	OnDeleteFn func(obj api.Object) error
+	OnCreateFn func(ctx context.Context, obj api.Object) error
+	OnUpdateFn func(ctx context.Context, obj api.Object) error
+	OnDeleteFn func(ctx context.Context, obj api.Object) error
 }
 
-func (a *AdmissionControllerFns) OnCreate(obj api.Object) error {
+func (a *AdmissionControllerFns) OnCreate(ctx context.Context, obj api.Object) error {
 	if a.OnCreateFn != nil {
-		return a.OnCreateFn(obj)
+		return a.OnCreateFn(ctx, obj)
 	}
 	return nil
 }
 
-func (a *AdmissionControllerFns) OnUpdate(obj api.Object) error {
+func (a *AdmissionControllerFns) OnUpdate(ctx context.Context, obj api.Object) error {
 	if a.OnUpdateFn != nil {
-		return a.OnUpdateFn(obj)
+		return a.OnUpdateFn(ctx, obj)
 	}
 	return nil
 }
 
-func (a *AdmissionControllerFns) OnDelete(obj api.Object) error {
+func (a *AdmissionControllerFns) OnDelete(ctx context.Context, obj api.Object) error {
 	if a.OnDeleteFn != nil {
-		return a.OnDeleteFn(obj)
+		return a.OnDeleteFn(ctx, obj)
 	}
 	return nil
 }
 
-// AdmissionControllerList executes a ordered list of AdmissionControllers, stopping at the first error.
+// AdmissionControllerList executes an ordered list of AdmissionControllers, stopping at the first error.
 type AdmissionControllerList []AdmissionController
 
-func (a *AdmissionControllerList) OnCreate(obj api.Object) error {
+func (a *AdmissionControllerList) OnCreate(ctx context.Context, obj api.Object) error {
 	for _, subA := range *a {
-		if err := subA.OnCreate(obj); err != nil {
+		if err := subA.OnCreate(ctx, obj); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (a *AdmissionControllerList) OnUpdate(obj api.Object) error {
+func (a *AdmissionControllerList) OnUpdate(ctx context.Context, obj api.Object) error {
 	for _, subA := range *a {
-		if err := subA.OnUpdate(obj); err != nil {
+		if err := subA.OnUpdate(ctx, obj); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (a *AdmissionControllerList) OnDelete(obj api.Object) error {
+func (a *AdmissionControllerList) OnDelete(ctx context.Context, obj api.Object) error {
 	for _, subA := range *a {
-		if err := subA.OnDelete(obj); err != nil {
+		if err := subA.OnDelete(ctx, obj); err != nil {
 			return err
 		}
 	}

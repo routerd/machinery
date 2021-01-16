@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package admission
 
 import (
+	"context"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"routerd.net/machinery/api"
 )
@@ -34,7 +37,7 @@ type GenericDefault struct{}
 
 var _ AdmissionController = (*GenericDefault)(nil)
 
-func (d *GenericDefault) Default(obj api.Object) error {
+func (d *GenericDefault) Default(ctx context.Context, obj api.Object) error {
 	if d, ok := obj.(defaulted); ok {
 		if err := d.Default(); err != nil {
 			return fmt.Errorf(
@@ -45,14 +48,40 @@ func (d *GenericDefault) Default(obj api.Object) error {
 	return nil
 }
 
-func (d *GenericDefault) OnCreate(obj api.Object) error {
-	return d.Default(obj)
+func (d *GenericDefault) OnCreate(ctx context.Context, obj api.Object) error {
+	if obj.ObjectMeta() != nil &&
+		len(obj.ObjectMeta().GetName()) == 0 &&
+		len(obj.ObjectMeta().GetGenerateName()) > 0 {
+		obj.ObjectMeta().SetName(obj.ObjectMeta().GetGenerateName() + generateNameSuffix())
+	}
+
+	return d.Default(ctx, obj)
 }
 
-func (d *GenericDefault) OnUpdate(obj api.Object) error {
-	return d.Default(obj)
+func (d *GenericDefault) OnUpdate(ctx context.Context, obj api.Object) error {
+	return d.Default(ctx, obj)
 }
 
-func (d *GenericDefault) OnDelete(obj api.Object) error {
-	return d.Default(obj)
+func (d *GenericDefault) OnDelete(ctx context.Context, obj api.Object) error {
+	return d.Default(ctx, obj)
+}
+
+var r *rand.Rand
+
+const (
+	suffixLength = 4
+	charset      = "abcdefghijklmnopqrstuvwxyz" +
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+)
+
+func generateNameSuffix() string {
+	c := make([]byte, suffixLength)
+	for i := range c {
+		c[i] = charset[r.Intn(len(c))]
+	}
+	return string(c)
+}
+
+func init() {
+	r = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
