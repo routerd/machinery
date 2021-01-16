@@ -40,6 +40,9 @@ type ObjectMeta interface {
 	GetLabels() map[string]string
 	SetLabels(map[string]string)
 
+	GetAnnotations() map[string]string
+	SetAnnotations(map[string]string)
+
 	// GetUid returns the UUID of the object.
 	// UUIDs are added by the storage implementation and ensures that
 	// objects with the same name and namespace, but different livecycle
@@ -71,6 +74,23 @@ type ObjectMeta interface {
 
 	GetGenerateName() string
 	SetGenerateName(string)
+
+	GetOwnerReferences() []OwnerReference
+	SetOwnerReferences([]OwnerReference)
+}
+
+type OwnerReference interface {
+	SetTypeURL(string)
+	GetTypeURL() string
+
+	GetNamespace() string
+	SetNamespace(string)
+
+	GetName() string
+	SetName(string)
+
+	GetUid() string
+	SetUid(string)
 }
 
 type ListObject interface {
@@ -78,4 +98,7 @@ type ListObject interface {
 	ListMeta() ListMeta
 }
 
-type ListMeta interface{}
+type ListMeta interface {
+	GetResourceVersion() string
+	SetResourceVersion(string)
+}

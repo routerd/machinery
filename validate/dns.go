@@ -33,7 +33,7 @@ func ValidateRFC1035Subdomain(subdomain string) error {
 	}
 
 	if !rfc1035SubdomainRegEx.MatchString(subdomain) {
-		return fmt.Errorf("rfc1035 DNS labels MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters, - or .")
+		return fmt.Errorf("rfc1035 DNS subdomains MUST be lowercase, start and end with an alphanumeric character and MUST only contain alphanumeric characters, - or .")
 	}
 
 	return nil

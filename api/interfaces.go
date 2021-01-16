@@ -28,7 +28,15 @@ type Client interface {
 
 // Reader allows to get objects from storage or cache.
 type Reader interface {
+	Getter
+	Lister
+}
+
+type Getter interface {
 	Get(ctx context.Context, nn NamespacedName, obj Object) error
+}
+
+type Lister interface {
 	List(ctx context.Context, listObj ListObject, opts ...ListOption) error
 }
 

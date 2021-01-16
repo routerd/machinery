@@ -16,25 +16,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+syntax = "proto3";
+package machinery.api.v1;
+option go_package = "routerd.net/machinery/api/v1";
 
-import (
-	"routerd.net/machinery/api"
-	machineryv1 "routerd.net/machinery/api/v1"
-)
-
-func (o *TestObject) ObjectMeta() api.ObjectMeta {
-	return &machineryv1.ObjectMetaAdapter{ObjectMeta: o.Meta}
+message BadRequest {
+  message FieldViolation {
+    string field = 1;
+    string description = 2;
+  }
+  repeated FieldViolation violations = 3;
 }
 
-func (o *TestObjectList) ListMeta() api.ListMeta {
-	return o.Meta
-}
-
-func (o *Namespace) ObjectMeta() api.ObjectMeta {
-	return &machineryv1.ObjectMetaAdapter{ObjectMeta: o.Meta}
-}
-
-func (o *NamespaceList) ListMeta() api.ListMeta {
-	return o.Meta
+message PreconditionFailure {
+  message PreconditionViolation {
+    string type = 1;
+    string description = 2;
+  }
+  repeated PreconditionViolation violations = 3;
 }

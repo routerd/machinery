@@ -168,7 +168,8 @@ type TestObjectList struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Items []*TestObject `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Meta  *v1.ListMeta  `protobuf:"bytes,1,opt,name=meta,proto3" json:"meta,omitempty"`
+	Items []*TestObject `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
 }
 
 func (x *TestObjectList) Reset() {
@@ -201,6 +202,13 @@ func (x *TestObjectList) ProtoReflect() protoreflect.Message {
 // Deprecated: Use TestObjectList.ProtoReflect.Descriptor instead.
 func (*TestObjectList) Descriptor() ([]byte, []int) {
 	return file_v1_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *TestObjectList) GetMeta() *v1.ListMeta {
+	if x != nil {
+		return x.Meta
+	}
+	return nil
 }
 
 func (x *TestObjectList) GetItems() []*TestObject {
@@ -427,7 +435,7 @@ type NamespaceList struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// List meta = 1;
+	Meta  *v1.ListMeta `protobuf:"bytes,1,opt,name=meta,proto3" json:"meta,omitempty"`
 	Items []*Namespace `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
 }
 
@@ -463,6 +471,13 @@ func (*NamespaceList) Descriptor() ([]byte, []int) {
 	return file_v1_proto_rawDescGZIP(), []int{7}
 }
 
+func (x *NamespaceList) GetMeta() *v1.ListMeta {
+	if x != nil {
+		return x.Meta
+	}
+	return nil
+}
+
 func (x *NamespaceList) GetItems() []*Namespace {
 	if x != nil {
 		return x.Items
@@ -489,9 +504,12 @@ var file_v1_proto_rawDesc = []byte{
 	0x63, 0x74, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73,
 	0x22, 0x2a, 0x0a, 0x10, 0x54, 0x65, 0x73, 0x74, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x53, 0x74,
 	0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x22, 0x49, 0x0a, 0x0e,
-	0x54, 0x65, 0x73, 0x74, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x37,
-	0x0a, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x21, 0x2e,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x22, 0x79, 0x0a, 0x0e,
+	0x54, 0x65, 0x73, 0x74, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x2e,
+	0x0a, 0x04, 0x6d, 0x65, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x6d,
+	0x61, 0x63, 0x68, 0x69, 0x6e, 0x65, 0x72, 0x79, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x76, 0x31, 0x2e,
+	0x4c, 0x69, 0x73, 0x74, 0x4d, 0x65, 0x74, 0x61, 0x52, 0x04, 0x6d, 0x65, 0x74, 0x61, 0x12, 0x37,
+	0x0a, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x21, 0x2e,
 	0x6d, 0x61, 0x63, 0x68, 0x69, 0x6e, 0x65, 0x72, 0x79, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61,
 	0x74, 0x61, 0x2e, 0x76, 0x31, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74,
 	0x52, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x22, 0x96, 0x01, 0x0a, 0x17, 0x54, 0x65, 0x73, 0x74,
@@ -527,8 +545,11 @@ var file_v1_proto_rawDesc = []byte{
 	0x30, 0x0a, 0x04, 0x6d, 0x65, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1c, 0x2e,
 	0x6d, 0x61, 0x63, 0x68, 0x69, 0x6e, 0x65, 0x72, 0x79, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x76, 0x31,
 	0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x4d, 0x65, 0x74, 0x61, 0x52, 0x04, 0x6d, 0x65, 0x74,
-	0x61, 0x22, 0x47, 0x0a, 0x0d, 0x4e, 0x61, 0x6d, 0x65, 0x73, 0x70, 0x61, 0x63, 0x65, 0x4c, 0x69,
-	0x73, 0x74, 0x12, 0x36, 0x0a, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28,
+	0x61, 0x22, 0x77, 0x0a, 0x0d, 0x4e, 0x61, 0x6d, 0x65, 0x73, 0x70, 0x61, 0x63, 0x65, 0x4c, 0x69,
+	0x73, 0x74, 0x12, 0x2e, 0x0a, 0x04, 0x6d, 0x65, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x1a, 0x2e, 0x6d, 0x61, 0x63, 0x68, 0x69, 0x6e, 0x65, 0x72, 0x79, 0x2e, 0x61, 0x70, 0x69,
+	0x2e, 0x76, 0x31, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x4d, 0x65, 0x74, 0x61, 0x52, 0x04, 0x6d, 0x65,
+	0x74, 0x61, 0x12, 0x36, 0x0a, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28,
 	0x0b, 0x32, 0x20, 0x2e, 0x6d, 0x61, 0x63, 0x68, 0x69, 0x6e, 0x65, 0x72, 0x79, 0x2e, 0x74, 0x65,
 	0x73, 0x74, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x76, 0x31, 0x2e, 0x4e, 0x61, 0x6d, 0x65, 0x73, 0x70,
 	0x61, 0x63, 0x65, 0x52, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x32, 0xe9, 0x04, 0x0a, 0x11, 0x54,
@@ -599,47 +620,50 @@ var file_v1_proto_goTypes = []interface{}{
 	(*Namespace)(nil),               // 6: machinery.testdata.v1.Namespace
 	(*NamespaceList)(nil),           // 7: machinery.testdata.v1.NamespaceList
 	(*v1.ObjectMeta)(nil),           // 8: machinery.api.v1.ObjectMeta
-	(*v1.DeleteRequestOptions)(nil), // 9: machinery.api.v1.DeleteRequestOptions
-	(*v1.CreateRequestOptions)(nil), // 10: machinery.api.v1.CreateRequestOptions
-	(*v1.UpdateRequestOptions)(nil), // 11: machinery.api.v1.UpdateRequestOptions
-	(*v1.GetRequest)(nil),           // 12: machinery.api.v1.GetRequest
-	(*v1.ListRequest)(nil),          // 13: machinery.api.v1.ListRequest
-	(*v1.WatchRequest)(nil),         // 14: machinery.api.v1.WatchRequest
-	(*v1.DeleteAllOfRequest)(nil),   // 15: machinery.api.v1.DeleteAllOfRequest
-	(*v1.ResourceEvent)(nil),        // 16: machinery.api.v1.ResourceEvent
-	(*v1.Status)(nil),               // 17: machinery.api.v1.Status
+	(*v1.ListMeta)(nil),             // 9: machinery.api.v1.ListMeta
+	(*v1.DeleteRequestOptions)(nil), // 10: machinery.api.v1.DeleteRequestOptions
+	(*v1.CreateRequestOptions)(nil), // 11: machinery.api.v1.CreateRequestOptions
+	(*v1.UpdateRequestOptions)(nil), // 12: machinery.api.v1.UpdateRequestOptions
+	(*v1.GetRequest)(nil),           // 13: machinery.api.v1.GetRequest
+	(*v1.ListRequest)(nil),          // 14: machinery.api.v1.ListRequest
+	(*v1.WatchRequest)(nil),         // 15: machinery.api.v1.WatchRequest
+	(*v1.DeleteAllOfRequest)(nil),   // 16: machinery.api.v1.DeleteAllOfRequest
+	(*v1.ResourceEvent)(nil),        // 17: machinery.api.v1.ResourceEvent
+	(*v1.Status)(nil),               // 18: machinery.api.v1.Status
 }
 var file_v1_proto_depIdxs = []int32{
 	8,  // 0: machinery.testdata.v1.TestObject.meta:type_name -> machinery.api.v1.ObjectMeta
 	1,  // 1: machinery.testdata.v1.TestObject.status:type_name -> machinery.testdata.v1.TestObjectStatus
-	0,  // 2: machinery.testdata.v1.TestObjectList.items:type_name -> machinery.testdata.v1.TestObject
-	0,  // 3: machinery.testdata.v1.TestObjectDeleteRequest.object:type_name -> machinery.testdata.v1.TestObject
-	9,  // 4: machinery.testdata.v1.TestObjectDeleteRequest.options:type_name -> machinery.api.v1.DeleteRequestOptions
-	0,  // 5: machinery.testdata.v1.TestObjectCreateRequest.object:type_name -> machinery.testdata.v1.TestObject
-	10, // 6: machinery.testdata.v1.TestObjectCreateRequest.options:type_name -> machinery.api.v1.CreateRequestOptions
-	0,  // 7: machinery.testdata.v1.TestObjectUpdateRequest.object:type_name -> machinery.testdata.v1.TestObject
-	11, // 8: machinery.testdata.v1.TestObjectUpdateRequest.options:type_name -> machinery.api.v1.UpdateRequestOptions
-	8,  // 9: machinery.testdata.v1.Namespace.meta:type_name -> machinery.api.v1.ObjectMeta
-	6,  // 10: machinery.testdata.v1.NamespaceList.items:type_name -> machinery.testdata.v1.Namespace
-	12, // 11: machinery.testdata.v1.TestObjectService.Get:input_type -> machinery.api.v1.GetRequest
-	13, // 12: machinery.testdata.v1.TestObjectService.List:input_type -> machinery.api.v1.ListRequest
-	14, // 13: machinery.testdata.v1.TestObjectService.Watch:input_type -> machinery.api.v1.WatchRequest
-	4,  // 14: machinery.testdata.v1.TestObjectService.Create:input_type -> machinery.testdata.v1.TestObjectCreateRequest
-	5,  // 15: machinery.testdata.v1.TestObjectService.Update:input_type -> machinery.testdata.v1.TestObjectUpdateRequest
-	3,  // 16: machinery.testdata.v1.TestObjectService.Delete:input_type -> machinery.testdata.v1.TestObjectDeleteRequest
-	15, // 17: machinery.testdata.v1.TestObjectService.DeleteAllOf:input_type -> machinery.api.v1.DeleteAllOfRequest
-	0,  // 18: machinery.testdata.v1.TestObjectService.Get:output_type -> machinery.testdata.v1.TestObject
-	2,  // 19: machinery.testdata.v1.TestObjectService.List:output_type -> machinery.testdata.v1.TestObjectList
-	16, // 20: machinery.testdata.v1.TestObjectService.Watch:output_type -> machinery.api.v1.ResourceEvent
-	0,  // 21: machinery.testdata.v1.TestObjectService.Create:output_type -> machinery.testdata.v1.TestObject
-	0,  // 22: machinery.testdata.v1.TestObjectService.Update:output_type -> machinery.testdata.v1.TestObject
-	0,  // 23: machinery.testdata.v1.TestObjectService.Delete:output_type -> machinery.testdata.v1.TestObject
-	17, // 24: machinery.testdata.v1.TestObjectService.DeleteAllOf:output_type -> machinery.api.v1.Status
-	18, // [18:25] is the sub-list for method output_type
-	11, // [11:18] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	9,  // 2: machinery.testdata.v1.TestObjectList.meta:type_name -> machinery.api.v1.ListMeta
+	0,  // 3: machinery.testdata.v1.TestObjectList.items:type_name -> machinery.testdata.v1.TestObject
+	0,  // 4: machinery.testdata.v1.TestObjectDeleteRequest.object:type_name -> machinery.testdata.v1.TestObject
+	10, // 5: machinery.testdata.v1.TestObjectDeleteRequest.options:type_name -> machinery.api.v1.DeleteRequestOptions
+	0,  // 6: machinery.testdata.v1.TestObjectCreateRequest.object:type_name -> machinery.testdata.v1.TestObject
+	11, // 7: machinery.testdata.v1.TestObjectCreateRequest.options:type_name -> machinery.api.v1.CreateRequestOptions
+	0,  // 8: machinery.testdata.v1.TestObjectUpdateRequest.object:type_name -> machinery.testdata.v1.TestObject
+	12, // 9: machinery.testdata.v1.TestObjectUpdateRequest.options:type_name -> machinery.api.v1.UpdateRequestOptions
+	8,  // 10: machinery.testdata.v1.Namespace.meta:type_name -> machinery.api.v1.ObjectMeta
+	9,  // 11: machinery.testdata.v1.NamespaceList.meta:type_name -> machinery.api.v1.ListMeta
+	6,  // 12: machinery.testdata.v1.NamespaceList.items:type_name -> machinery.testdata.v1.Namespace
+	13, // 13: machinery.testdata.v1.TestObjectService.Get:input_type -> machinery.api.v1.GetRequest
+	14, // 14: machinery.testdata.v1.TestObjectService.List:input_type -> machinery.api.v1.ListRequest
+	15, // 15: machinery.testdata.v1.TestObjectService.Watch:input_type -> machinery.api.v1.WatchRequest
+	4,  // 16: machinery.testdata.v1.TestObjectService.Create:input_type -> machinery.testdata.v1.TestObjectCreateRequest
+	5,  // 17: machinery.testdata.v1.TestObjectService.Update:input_type -> machinery.testdata.v1.TestObjectUpdateRequest
+	3,  // 18: machinery.testdata.v1.TestObjectService.Delete:input_type -> machinery.testdata.v1.TestObjectDeleteRequest
+	16, // 19: machinery.testdata.v1.TestObjectService.DeleteAllOf:input_type -> machinery.api.v1.DeleteAllOfRequest
+	0,  // 20: machinery.testdata.v1.TestObjectService.Get:output_type -> machinery.testdata.v1.TestObject
+	2,  // 21: machinery.testdata.v1.TestObjectService.List:output_type -> machinery.testdata.v1.TestObjectList
+	17, // 22: machinery.testdata.v1.TestObjectService.Watch:output_type -> machinery.api.v1.ResourceEvent
+	0,  // 23: machinery.testdata.v1.TestObjectService.Create:output_type -> machinery.testdata.v1.TestObject
+	0,  // 24: machinery.testdata.v1.TestObjectService.Update:output_type -> machinery.testdata.v1.TestObject
+	0,  // 25: machinery.testdata.v1.TestObjectService.Delete:output_type -> machinery.testdata.v1.TestObject
+	18, // 26: machinery.testdata.v1.TestObjectService.DeleteAllOf:output_type -> machinery.api.v1.Status
+	20, // [20:27] is the sub-list for method output_type
+	13, // [13:20] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_v1_proto_init() }

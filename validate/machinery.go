@@ -20,6 +20,8 @@ package validate
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 
 	"routerd.net/machinery/api"
 )
@@ -65,6 +67,41 @@ func ValidateName(name string) error {
 func ValidateNamespace(namespace string) error {
 	if err := ValidateRFC1035Subdomain(namespace); err != nil {
 		return fmt.Errorf("invalid namespace %q: %w", namespace, err)
+	}
+	return nil
+}
+
+var qualifiedKeyName = regexp.
+	MustCompile(`^[a-zA-Z0-9]([-_\.a-zA-Z0-9]*[a-zA-Z0-9])?$`)
+
+func ValidateKey(key string) error {
+	if len(key) > 63 {
+		return fmt.Errorf("must be 63 characters or less")
+	}
+	if !qualifiedKeyName.MatchString(key) {
+		return fmt.Errorf("must start and end with an alphanumeric character with [a-zA-Z0-9], dashes (-), underscores (_) or dots (.) are allowed between")
+	}
+	return nil
+}
+
+func ValidateQualifiedKey(key string) error {
+	if len(key) == 0 {
+		return nil
+	}
+
+	var name, prefix string
+	if i := strings.LastIndex(key, "/"); i == -1 {
+		name = key
+	} else {
+		name = key[:i]
+		prefix = key[i+1:]
+	}
+	if err := ValidateKey(name); err != nil {
+		return err
+	}
+
+	if len(prefix) > 0 {
+		return ValidateRFC1035Subdomain(prefix)
 	}
 	return nil
 }

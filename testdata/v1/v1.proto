@@ -34,7 +34,8 @@ message TestObjectStatus {
 }
 
 message TestObjectList {
-  repeated TestObject items = 1;
+  machinery.api.v1.ListMeta meta = 1;
+  repeated TestObject items = 2;
 }
 
 message TestObjectDeleteRequest {
@@ -67,6 +68,6 @@ message Namespace {
 }
 
 message NamespaceList {
-  // List meta = 1;
+  machinery.api.v1.ListMeta meta = 1;
   repeated Namespace items = 2;
 }

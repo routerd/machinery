@@ -30,8 +30,10 @@ SHORT_SHA=$(shell git rev-parse --short HEAD)
 VERSION?=${BRANCH}-${SHORT_SHA}
 
 PROTOC_VERSION:=v3.13.0
-PROTOCGENGO_VERSION:=v1.25.0
-PROTOCGENGOGRPC_VERSION:=v1.0.1
+PROTOC_GENGO_VERSION:=v1.25.0
+PROTOC_GENGO_GRPC_VERSION:=v1.0.1
+PROTOC_GEN_GRPCGATEWAY_VERSION:=v2.1.0
+PROTOC_GEN_OPENAPIV2_VERSION:=${PROTOC_GEN_GRPCGATEWAY_VERSION}
 
 export CGO_ENABLED:=0
 export GO111MODULE:=on
@@ -90,45 +92,73 @@ $(PROTOC):
 	@mkdir -p $(dir $(PROTOC))
 	@touch $(PROTOC)
 
-PROTOCGENGO := $(TMP_VERSIONS)/protoc-gen-go/$(PROTOCGENGO_VERSION)
-$(PROTOCGENGO):
-	$(eval PROTOCGENGO_TMP := $(shell mktemp -d))
-	@cd $(PROTOCGENGO_TMP); go get google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOCGENGO_VERSION)
-	@rm -rf $(PROTOCGENGO_TMP)
-	@rm -rf $(dir $(PROTOCGENGO))
-	@mkdir -p $(dir $(PROTOCGENGO))
-	@touch $(PROTOCGENGO)
+PROTOC_GENGO_ := $(TMP_VERSIONS)/protoc-gen-go/$(PROTOC_GENGO_VERSION)
+$(PROTOC_GENGO_):
+	$(eval PROTOC_GENGO__TMP := $(shell mktemp -d))
+	@cd $(PROTOC_GENGO__TMP); go get google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GENGO_VERSION)
+	@rm -rf $(PROTOC_GENGO__TMP)
+	@rm -rf $(dir $(PROTOC_GENGO_))
+	@mkdir -p $(dir $(PROTOC_GENGO_))
+	@touch $(PROTOC_GENGO_)
 
-PROTOCGENGOGRPC := $(TMP_VERSIONS)/protoc-gen-go-grpc/$(PROTOCGENGOGRPC_VERSION)
-$(PROTOCGENGOGRPC):
-	$(eval PROTOCGENGOGRPC_TMP := $(shell mktemp -d))
-	@cd $(PROTOCGENGOGRPC_TMP); go get google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOCGENGOGRPC_VERSION)
-	@rm -rf $(PROTOCGENGOGRPC_TMP)
-	@rm -rf $(dir $(PROTOCGENGOGRPC))
-	@mkdir -p $(dir $(PROTOCGENGOGRPC))
-	@touch $(PROTOCGENGOGRPC)
+PROTOC_GENGO_GRPC := $(TMP_VERSIONS)/protoc-gen-go-grpc/$(PROTOC_GENGO_GRPC_VERSION)
+$(PROTOC_GENGO_GRPC):
+	$(eval PROTOC_GENGO_GRPC_TMP := $(shell mktemp -d))
+	@cd $(PROTOC_GENGO_GRPC_TMP); go get google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GENGO_GRPC_VERSION)
+	@rm -rf $(PROTOC_GENGO_GRPC_TMP)
+	@rm -rf $(dir $(PROTOC_GENGO_GRPC))
+	@mkdir -p $(dir $(PROTOC_GENGO_GRPC))
+	@touch $(PROTOC_GENGO_GRPC)
+
+PROTOC_GEN_GRPCGATEWAY := $(TMP_VERSIONS)/protoc-gen-go-grpc-gateway/$(PROTOC_GEN_GRPCGATEWAY_VERSION)
+$(PROTOC_GEN_GRPCGATEWAY):
+	$(eval PROTOC_GEN_GRPCGATEWAY_TMP := $(shell mktemp -d))
+	@cd $(PROTOC_GEN_GRPCGATEWAY_TMP); go get github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@$(PROTOC_GEN_GRPCGATEWAY_VERSION)
+	@rm -rf $(PROTOC_GEN_GRPCGATEWAY_TMP)
+	@rm -rf $(dir $(PROTOC_GEN_GRPCGATEWAY))
+	@mkdir -p $(dir $(PROTOC_GEN_GRPCGATEWAY))
+	@touch $(PROTOC_GEN_GRPCGATEWAY)
+
+PROTOC_GEN_OPENAPIV2 := $(TMP_VERSIONS)/protoc-gen-openapi-v2/$(PROTOC_GEN_OPENAPIV2_VERSION)
+$(PROTOC_GEN_OPENAPIV2):
+	$(eval PROTOC_GEN_OPENAPIV2_TMP := $(shell mktemp -d))
+	@cd $(PROTOC_GEN_OPENAPIV2_TMP); go get github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@$(PROTOC_GEN_OPENAPIV2_VERSION)
+	@rm -rf $(PROTOC_GEN_OPENAPIV2_TMP)
+	@rm -rf $(dir $(PROTOC_GEN_OPENAPIV2))
+	@mkdir -p $(dir $(PROTOC_GEN_OPENAPIV2))
+	@touch $(PROTOC_GEN_OPENAPIV2)
 
 # ----------
 # Generators
 # ----------
 
-%.proto: FORCE $(PROTOC) $(PROTOCGENGO) $(PROTOCGENGOGRPC)
+%.proto: FORCE $(PROTOC) $(PROTOCGENGO) $(PROTOCGENGOGRPC) $(PROTOC_GEN_GRPCGATEWAY) $(PROTOC_GEN_OPENAPIV2)
 	$(eval PROTO_DIR := $(shell dirname $@))
 	@ echo generating $@
 	@protoc \
 		--go_out=$(PROTO_DIR) --go_opt=paths=source_relative \
 		--go-grpc_out=$(PROTO_DIR) --go-grpc_opt=paths=source_relative \
+		--grpc-gateway_out=$(PROTO_DIR) \
+		--grpc-gateway_opt paths=source_relative \
+		--grpc-gateway_opt generate_unbound_methods=true \
 		-I$(TMP)/include \
 		-Iapi/v1 \
 		-I$(PROTO_DIR) $@
 
 	$(eval PROTO_FILEBASE := $(PROTO_DIR)/$(shell basename $@ .proto))
+	@# add boilerplate to _grpc.pb.go files
 	@test -s $(PROTO_FILEBASE)_grpc.pb.go && \
 		cat hack/boilerplate/boilerplate.generatego.txt | sed s/YEAR/2020/ > $(PROTO_FILEBASE)_grpc.pb.go.tmp && \
 		cat $(PROTO_FILEBASE)_grpc.pb.go >> $(PROTO_FILEBASE)_grpc.pb.go.tmp && \
 		mv $(PROTO_FILEBASE)_grpc.pb.go.tmp $(PROTO_FILEBASE)_grpc.pb.go && \
-		goimports -local routerd.net -w $(PROTO_FILEBASE)_grpc.pb.go || \
-		true
+		goimports -local routerd.net -w $(PROTO_FILEBASE)_grpc.pb.go; true
+
+	@# add boilerplate to .pb.gw.go files
+	@test -s $(PROTO_FILEBASE).pb.gw.go && \
+		cat hack/boilerplate/boilerplate.generatego.txt | sed s/YEAR/2020/ > $(PROTO_FILEBASE).pb.gw.go.tmp && \
+		cat $(PROTO_FILEBASE).pb.gw.go >> $(PROTO_FILEBASE).pb.gw.go.tmp && \
+		mv $(PROTO_FILEBASE).pb.gw.go.tmp $(PROTO_FILEBASE).pb.gw.go && \
+		goimports -local routerd.net -w $(PROTO_FILEBASE).pb.gw.go; true
 
 	@goimports -local routerd.net -w $(PROTO_FILEBASE).pb.go
 

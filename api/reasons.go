@@ -16,25 +16,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package api
 
-import (
-	"routerd.net/machinery/api"
-	machineryv1 "routerd.net/machinery/api/v1"
+// Common status descriptions.
+const (
+	NotEmptyDescription = "May not be empty."
 )
-
-func (o *TestObject) ObjectMeta() api.ObjectMeta {
-	return &machineryv1.ObjectMetaAdapter{ObjectMeta: o.Meta}
-}
-
-func (o *TestObjectList) ListMeta() api.ListMeta {
-	return o.Meta
-}
-
-func (o *Namespace) ObjectMeta() api.ObjectMeta {
-	return &machineryv1.ObjectMetaAdapter{ObjectMeta: o.Meta}
-}
-
-func (o *NamespaceList) ListMeta() api.ListMeta {
-	return o.Meta
-}

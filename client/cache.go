@@ -23,14 +23,66 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"routerd.net/machinery/api"
 	"routerd.net/machinery/errors"
 )
 
+type ListWatcher interface {
+	api.Lister
+	api.Watcher
+}
+
 type Cache struct {
+	listWatcher        ListWatcher
+	objectFullName     protoreflect.FullName
+	listObjectFullName protoreflect.FullName
+
 	objects map[string]api.Object
 	mux     sync.RWMutex
+}
+
+func NewCache(
+	objType api.Object,
+	listWatcher ListWatcher,
+) *Cache {
+	objName := objType.ProtoReflect().Descriptor().FullName()
+	listObjName := protoreflect.FullName(objName + "List")
+
+	return &Cache{
+		listWatcher:        listWatcher,
+		objectFullName:     objName,
+		listObjectFullName: listObjName,
+		objects:            map[string]api.Object{},
+	}
+}
+
+func (c *Cache) Run(stopCh <-chan struct{}) error {
+	// ctx := context.Background()
+	// ctx, cancel := context.WithCancel(ctx)
+	// defer cancel()
+
+	// listObjDesc, err := protoregistry.GlobalFiles.FindDescriptorByName(c.listObjectFullName)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// list := listObjDesc
+
+	// // protoreflect.
+	// list := c.listObjectFullName.ProtoReflect().
+	// 	New().Interface().(api.ObjectList)
+	// c.listWatcher.List(ctx)
+
+	// for {
+	// 	select {
+	// 	case <-stopCh:
+	// 		return nil
+	// 	default:
+
+	// 	}
+	// }
+	return nil
 }
 
 func (c *Cache) Get(ctx context.Context, nn api.NamespacedName, obj api.Object) error {

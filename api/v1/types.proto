@@ -63,6 +63,19 @@ message ObjectMeta {
   // MAY be specified instead of the Name field to let the server generate a name for the object.
   // Given string is used as prefix. e.g. "test-obj-" -> "test-obj-xxx"
   string generateName = 11;
+
+  repeated OwnerReference ownerReferences = 12;
+}
+
+message OwnerReference {
+  string typeURL = 1;
+  string namespace = 2;
+  string name = 3;
+  string uid = 4;
+}
+
+message ListMeta {
+  string resourceVersion = 1;
 }
 
 // ResourceEvent informs clients about changes to stored objects.
