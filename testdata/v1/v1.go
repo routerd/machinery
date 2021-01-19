@@ -24,6 +24,9 @@ import (
 )
 
 func (o *TestObject) ObjectMeta() api.ObjectMeta {
+	if o.Meta == nil {
+		return nil
+	}
 	return &machineryv1.ObjectMetaAdapter{ObjectMeta: o.Meta}
 }
 
@@ -32,6 +35,9 @@ func (o *TestObjectList) ListMeta() api.ListMeta {
 }
 
 func (o *Namespace) ObjectMeta() api.ObjectMeta {
+	if o.Meta == nil {
+		return nil
+	}
 	return &machineryv1.ObjectMetaAdapter{ObjectMeta: o.Meta}
 }
 

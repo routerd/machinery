@@ -29,7 +29,7 @@ import (
 
 // defaulted may be implemented by objects to set field default values.
 type defaulted interface {
-	Default() error
+	Default(ctx context.Context) error
 }
 
 // The GenericDefault AdmissionController calls the .Default() method on the given object, if this method is implemented.
@@ -37,9 +37,9 @@ type GenericDefault struct{}
 
 var _ AdmissionController = (*GenericDefault)(nil)
 
-func (d *GenericDefault) Default(ctx context.Context, obj api.Object) error {
+func (d *GenericDefault) callDefault(ctx context.Context, obj api.Object) error {
 	if d, ok := obj.(defaulted); ok {
-		if err := d.Default(); err != nil {
+		if err := d.Default(ctx); err != nil {
 			return fmt.Errorf(
 				"defaulting object of type %s: %w",
 				obj.ProtoReflect().Descriptor().FullName(), err)
@@ -55,15 +55,15 @@ func (d *GenericDefault) OnCreate(ctx context.Context, obj api.Object) error {
 		obj.ObjectMeta().SetName(obj.ObjectMeta().GetGenerateName() + generateNameSuffix())
 	}
 
-	return d.Default(ctx, obj)
+	return d.callDefault(ctx, obj)
 }
 
 func (d *GenericDefault) OnUpdate(ctx context.Context, obj api.Object) error {
-	return d.Default(ctx, obj)
+	return d.callDefault(ctx, obj)
 }
 
 func (d *GenericDefault) OnDelete(ctx context.Context, obj api.Object) error {
-	return d.Default(ctx, obj)
+	return d.callDefault(ctx, obj)
 }
 
 var r *rand.Rand

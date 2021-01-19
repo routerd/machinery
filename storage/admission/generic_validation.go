@@ -101,14 +101,14 @@ func (v *GenericValidation) validateMetadata(obj api.Object) (
 	for k, v := range meta.GetAnnotations() {
 		if err := validate.ValidateQualifiedKey(k); err != nil {
 			violations = append(violations, &v1.BadRequest_FieldViolation{
-				Field:       fmt.Sprintf(".meta.annoations[%d]", i),
+				Field:       fmt.Sprintf(".meta.annotations[%d]", i),
 				Description: fmt.Sprintf("invalid key: %s", err.Error()),
 			})
 		}
 
 		if len(v) > 1024 {
 			violations = append(violations, &v1.BadRequest_FieldViolation{
-				Field:       fmt.Sprintf(".meta.annoations[%d]", i),
+				Field:       fmt.Sprintf(".meta.annotations[%d]", i),
 				Description: "invalid value: Must be 1024 characters or less",
 			})
 		}
@@ -186,6 +186,25 @@ func (v *GenericValidation) OnUpdate(ctx context.Context, obj api.Object) error 
 		return err
 	}
 
+	violations = append(violations, v.validateUpdate(ctx, obj, old)...)
+
+	if vobj, ok := obj.(validateUpdate); ok {
+		err := vobj.ValidateUpdate(ctx, old)
+		s, ok := status.FromError(err)
+		if ok && s.Code() == codes.InvalidArgument {
+			// add the details from the status
+			violations = append(violations, asProtoMessages(s.Details())...)
+		} else if err != nil {
+			// unknown error/other status code
+			return err
+		}
+	}
+	return checkViolations(violations)
+}
+
+func (v *GenericValidation) validateUpdate(ctx context.Context, obj, old api.Object) []proto.Message {
+	var violations []proto.Message
+
 	// Finalizer Handling
 	if obj.ObjectMeta().GetDeletedTimestamp() != nil ||
 		old.ObjectMeta().GetDeletedTimestamp() != nil {
@@ -250,18 +269,7 @@ func (v *GenericValidation) OnUpdate(ctx context.Context, obj api.Object) error 
 		})
 	}
 
-	if vobj, ok := obj.(validateUpdate); ok {
-		err := vobj.ValidateUpdate(ctx, old)
-		s, ok := status.FromError(err)
-		if ok && s.Code() == codes.InvalidArgument {
-			// add the details from the status
-			violations = append(violations, asProtoMessages(s.Details())...)
-		} else if err != nil {
-			// unknown error/other status code
-			return err
-		}
-	}
-	return checkViolations(violations)
+	return violations
 }
 
 type validateDelete interface {
