@@ -128,11 +128,21 @@ $(PROTOC_GEN_OPENAPIV2):
 	@mkdir -p $(dir $(PROTOC_GEN_OPENAPIV2))
 	@touch $(PROTOC_GEN_OPENAPIV2)
 
+PROTO_GRPC_GATEWAY_INCLUDES := $(TMP_VERSIONS)/proto-grpc-gateway-includes/$(PROTOC_GEN_GRPCGATEWAY_VERSION)
+$(PROTO_GRPC_GATEWAY_INCLUDES):
+	$(eval PROTO_GRPC_GATEWAY_INCLUDES_TMP := $(shell mktemp -d))
+	@cd $(PROTO_GRPC_GATEWAY_INCLUDES_TMP); git clone https://github.com/grpc-ecosystem/grpc-gateway --depth=1 --branch=$(PROTOC_GEN_GRPCGATEWAY_VERSION) .
+	@cp -a $(PROTO_GRPC_GATEWAY_INCLUDES_TMP)/third_party/googleapis/google/* $(TMP)/include/google
+	@rm -rf $(PROTO_GRPC_GATEWAY_INCLUDES_TMP)
+	@rm -rf $(dir $(PROTO_GRPC_GATEWAY_INCLUDES))
+	@mkdir -p $(dir $(PROTO_GRPC_GATEWAY_INCLUDES))
+	@touch $(PROTO_GRPC_GATEWAY_INCLUDES)
+
 # ----------
 # Generators
 # ----------
 
-%.proto: FORCE $(PROTOC) $(PROTOCGENGO) $(PROTOCGENGOGRPC) $(PROTOC_GEN_GRPCGATEWAY) $(PROTOC_GEN_OPENAPIV2)
+%.proto: FORCE $(PROTOC) $(PROTOCGENGO) $(PROTOCGENGOGRPC) $(PROTOC_GEN_GRPCGATEWAY) $(PROTOC_GEN_OPENAPIV2) $(PROTO_GRPC_GATEWAY_INCLUDES)
 	$(eval PROTO_DIR := $(shell dirname $@))
 	@ echo generating $@
 	@protoc \
